@@ -24,12 +24,13 @@ OUT OF DOMAIN (Forbidden Topics):
 - Writing code / programming, math problems, general trivia, world history, politics, sports news, cooking recipes, poems, homework help, personal life advice.
 
 POSSIBLE INTENTS:
-1. "greeting": Pure greetings or salutations (e.g., 'hi', 'hello', 'hey', 'good morning', 'namaste').
-2. "casual_chat": Pleasantries, politeness, gratitude, or conversational banter (e.g., 'thanks', 'thank you', 'how are you', 'who are you', 'ok got it', 'goodbye').
-3. "escalation_request": Explicit request to talk to a human agent/manager, OR confirming/accepting an assistant's prior offer to open a support ticket or connect to human support.
-4. "complaint": Severe dissatisfaction, anger, scam/fraud allegations, defective product complaints, or legal threats.
-5. "rag_query": Legitimate customer support questions or requests about orders, shipping, returns, warranty, billing, account, or company policies.
-6. "out_of_domain": Questions or requests completely unrelated to our store/support domain.
+1. "greeting": Pure greetings or salutations (e.g., 'hi', 'hello', 'hey', 'good morning', 'namaste', 'kaise ho').
+2. "casual_chat": Pleasantries, gratitude, casual conversational remarks (e.g., 'thanks', 'how are you', 'ok', 'acha', 'theek hai', 'cool'), OR language preferences (e.g., 'can you talk in hindi', 'hindi me baat karo', 'aap mujhe hindi me bata skte hai').
+3. "session_query": Questions asking about the current chat session or active ticket (e.g., 'what is my ticket number?', 'mera ticket number kya hai?', 'ticket status?').
+4. "escalation_request": Explicit request to talk to a human agent/manager, OR confirming an offer to open a ticket.
+5. "complaint": Severe dissatisfaction, anger, scam/fraud allegations, defective product complaints, or legal threats.
+6. "rag_query": Legitimate customer support questions or requests about orders, shipping, returns, warranty, billing, account, or company policies.
+7. "out_of_domain": Questions or requests completely unrelated to our store/support domain (e.g., coding, general trivia, politics, recipes).
 
 Respond ONLY in JSON format:
 {"intent": "<one_of_the_above>", "reasoning": "<short explanation>"}
@@ -46,37 +47,44 @@ Respond ONLY in JSON format:
         # Default fallback intent
         intent = "rag_query"
 
-        # 1. Check if assistant previously offered escalation, and user is affirming it
-        last_assistant_msg = ""
-        for turn in reversed(history):
-            if turn.get("role") == "assistant":
-                last_assistant_msg = turn.get("content", "").lower()
-                break
+        # 1. Ticket / Session status query (e.g. "what is my ticket number?", "mera ticket no kya hai?")
+        if any(phrase in lower_msg for phrase in [
+            "ticket number", "ticket no", "mera ticket", "kya ticket", "ticket status",
+            "active ticket", "my ticket", "ticket banaya", "ticket generate", "ticket details"
+        ]):
+            intent = "session_query"
 
-        offered_escalation = any(phrase in last_assistant_msg for phrase in [
+        # 2. Language requests (e.g. "can you talk in hindi", "hindi me baat karo", "aap mujhe hindi me bata skte hai")
+        elif any(phrase in lower_msg for phrase in [
+            "hindi me", "talk in hindi", "speak in hindi", "hindi me bata", "hindi bolo",
+            "hindi aati hai", "can you speak hindi", "can you talk to me in hindi", "english me", "talk in english"
+        ]):
+            intent = "casual_chat"
+
+        # 3. Check if assistant previously offered escalation, and user is affirming it
+        elif any(phrase in (history[-1].get("content", "").lower() if history else "") for phrase in [
             "connect you with a human", "connect with a human", "open a support ticket",
             "human specialist", "support ticket for you", "create a ticket", "escalate this issue"
-        ])
-
-        affirmative_words = {"yes", "yeah", "yep", "sure", "please", "ok", "okay", "do that", "yes please", "connect me", "open ticket"}
-        if offered_escalation and (clean_msg in affirmative_words or any(w in lower_msg.split() for w in ["yes", "yeah", "please", "connect"])):
+        ]) and (clean_msg in {"yes", "yeah", "yep", "sure", "please", "ok", "okay", "do that", "yes please", "connect me", "open ticket"} or any(w in lower_msg.split() for w in ["yes", "yeah", "please", "connect"])):
             intent = "escalation_request"
 
-        # 2. Pure Greetings (only if message is short greeting, not a full question)
-        elif clean_msg in {"hi", "hello", "hey", "good morning", "good evening", "good afternoon", "namaste", "hola", "greetings"} or (
-            len(clean_msg.split()) <= 2 and any(clean_msg.startswith(g) for g in ["hi ", "hello ", "hey "])
-        ):
+        # 4. Pure Greetings (only if message is short greeting, not a full question)
+        elif clean_msg in {
+            "hi", "hello", "hey", "good morning", "good evening", "good afternoon",
+            "namaste", "namaskar", "hola", "greetings", "kaise ho", "kya haal hai"
+        } or (len(clean_msg.split()) <= 2 and any(clean_msg.startswith(g) for g in ["hi ", "hello ", "hey "])):
             intent = "greeting"
 
-        # 3. Casual chit-chat / gratitude / pleasantries
+        # 5. Casual chit-chat / gratitude / pleasantries (Hindi + English)
         elif clean_msg in {
-            "thanks", "thank you", "thx", "thank you so much", "thanks a lot",
-            "how are you", "how are you doing", "who are you", "what can you do",
-            "ok", "okay", "alright", "got it", "cool", "bye", "goodbye", "see you"
+            "thanks", "thank you", "thx", "thank you so much", "thanks a lot", "shukriya", "dhanyawad",
+            "how are you", "how are you doing", "who are you", "what can you do", "kya kar sakte ho",
+            "ok", "okay", "alright", "got it", "cool", "bye", "goodbye", "see you",
+            "acha", "achha", "theek hai", "thik h", "theek h", "sahi hai", "haan", "han"
         }:
             intent = "casual_chat"
 
-        # 4. Explicit human escalation phrases
+        # 6. Explicit human escalation phrases
         elif any(phrase in lower_msg for phrase in [
             "talk to human", "speak to human", "real person", "manager",
             "human representative", "human agent", "escalate to human",
@@ -85,11 +93,11 @@ Respond ONLY in JSON format:
         ]):
             intent = "escalation_request"
 
-        # 5. Severe complaints
+        # 7. Severe complaints
         elif any(w in lower_msg for w in ["scam", "fraud", "sue you", "worst service", "lawyer", "consumer court", "cheated", "stolen"]):
             intent = "complaint"
 
-        # 6. Obvious Out-of-Domain indicators
+        # 8. Obvious Out-of-Domain indicators
         elif any(phrase in lower_msg for phrase in [
             "python code", "write a code", "write code", "javascript", "solve this", "math problem",
             "who is the president", "capital of", "who wrote", "weather in", "write a poem", "write an essay",
@@ -110,7 +118,7 @@ Respond ONLY in JSON format:
                     try:
                         data = json.loads(res)
                         parsed_intent = data.get("intent", "rag_query")
-                        if parsed_intent in ["greeting", "casual_chat", "escalation_request", "complaint", "rag_query", "out_of_domain"]:
+                        if parsed_intent in ["greeting", "casual_chat", "session_query", "escalation_request", "complaint", "rag_query", "out_of_domain"]:
                             intent = parsed_intent
                     except Exception as e:
                         logger.warning(f"Error parsing coordinator response: {e}")

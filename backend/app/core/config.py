@@ -43,8 +43,8 @@ class Settings(BaseSettings):
 
     # Google Gemini Settings (Google AI Studio Free Tier)
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-1.5-flash"
-    GEMINI_EMBEDDING_MODEL: str = "models/text-embedding-004"
+    GEMINI_MODEL: str = "gemini-flash-latest"
+    GEMINI_EMBEDDING_MODEL: str = "models/gemini-embedding-001"
 
     # OpenAI Settings (Alternative)
     OPENAI_API_KEY: str = ""
@@ -54,7 +54,7 @@ class Settings(BaseSettings):
 
     # Agent Thresholds
     SENTIMENT_ESCALATION_THRESHOLD: float = 0.35  # Threshold <= 0.35 triggers human escalation
-    MAX_HISTORY_TURNS: int = 8
+    MAX_HISTORY_TURNS: int = 20
 
     model_config = SettingsConfigDict(
         env_file=(".env", "backend/.env"),

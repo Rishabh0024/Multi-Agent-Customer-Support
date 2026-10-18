@@ -12,14 +12,15 @@ class RAGAgent:
 Your objective is to provide an accurate, helpful, and natural answer grounded strictly in our official knowledge base documentation and recent conversation history.
 
 Rules:
-1. Ground your answer in the provided Documentation Context.
-2. Maintain natural continuity with the Conversation History (e.g., if user asks follow-up questions about a previously mentioned policy, order, or product).
-3. If the documentation context DOES NOT contain the answer or does not fully cover the user's specific request:
+1. MATCH USER'S LANGUAGE: If the user asked in Hindi or Hinglish, answer in clear, polite Hindi/Hinglish! If in English, answer in English.
+2. Ground your answer in the provided Documentation Context.
+3. Maintain natural continuity with the Conversation History (e.g., if user asks follow-up questions about a previously mentioned policy, order, or product).
+4. If the documentation context DOES NOT contain the answer or does not fully cover the user's specific request:
    - State clearly that our official knowledge base does not contain this specific information.
-   - Do NOT invent or hallucinate policies.
+   - Do NOT invent or hallucinate policies, and do NOT dump irrelevant documentation.
    - Offer to connect them with a human customer support specialist or open a support ticket.
-4. Keep the response polite, clear, and easy to read using markdown bullet points for conditions or steps.
-5. Mention the source document title at the end.
+5. Keep the response polite, clear, and easy to read using markdown bullet points for conditions or steps.
+6. Mention the source document title at the end.
 """
 
     async def run(self, state: AgentState) -> AgentState:
@@ -48,7 +49,6 @@ Rules:
         top_score = docs[0].get("score", 0.0) if docs else 0.0
 
         # Check if the retrieved documents are relevant
-        # Cosine similarity in Qdrant: if >= 0.35, it's considered a relevant match
         if docs and top_score >= 0.35:
             confidence_score = top_score
             context_text = "\n\n".join([
@@ -72,23 +72,20 @@ Rules:
                 if res and res.strip():
                     raw_answer = res.strip()
 
-            # Deterministic synthesis if LLM is offline or rate-limited
+            # Deterministic synthesis ONLY if top score is high and LLM was offline
             if not raw_answer:
-                top_doc = docs[0]
-                raw_answer = (
-                    f"Based on our official **{top_doc['title']}**:\n\n"
-                    f"{top_doc['content']}\n\n"
-                    f"*Source: {top_doc['title']} ({top_doc.get('category', 'Support')})*"
-                )
-        elif docs:
-            # Low similarity match or partially relevant
-            top_doc = docs[0]
-            confidence_score = 0.30
-            raw_answer = (
-                f"I found some related information in our documentation under **{top_doc['title']}**, but it may not fully address your specific request:\n\n"
-                f"{top_doc['content'][:350]}...\n\n"
-                f"Would you like me to connect you with a human support specialist or open a support ticket for personalized assistance?"
-            )
+                if top_score >= 0.50:
+                    top_doc = docs[0]
+                    raw_answer = (
+                        f"Based on our official **{top_doc['title']}**:\n\n"
+                        f"{top_doc['content']}\n\n"
+                        f"*Source: {top_doc['title']} ({top_doc.get('category', 'Support')})*"
+                    )
+                else:
+                    raw_answer = (
+                        "I searched our official documentation, but I couldn't find specific details directly answering your question in our current knowledge base.\n\n"
+                        "Since this requires specialized assistance, I would be glad to open a support ticket and connect you with a human customer support specialist. Would you like me to open a support ticket for you?"
+                    )
         else:
             confidence_score = 0.20
             raw_answer = (

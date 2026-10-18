@@ -41,7 +41,7 @@ class SupportAgentGraph:
                 intent = state.get("intent")
                 if intent in ["escalation_request", "complaint"]:
                     return "escalation"
-                elif intent in ["greeting", "casual_chat", "out_of_domain"]:
+                elif intent in ["greeting", "casual_chat", "out_of_domain", "session_query"]:
                     return "formatter"
                 return "rag"
 
@@ -79,7 +79,13 @@ class SupportAgentGraph:
             logger.error(f"Error compiling LangGraph: {e}. Fallback to manual execution.")
             self.compiled_graph = None
 
-    async def execute(self, session_id: str, user_message: str, history: List[Dict[str, str]]) -> AgentState:
+    async def execute(
+        self,
+        session_id: str,
+        user_message: str,
+        history: List[Dict[str, str]],
+        existing_ticket_number: Optional[str] = None
+    ) -> AgentState:
         """Executes the multi-agent graph with the given user message."""
         initial_state: AgentState = {
             "session_id": session_id,
@@ -92,11 +98,12 @@ class SupportAgentGraph:
             "raw_answer": "",
             "escalation_required": False,
             "ticket_id": None,
-            "ticket_number": None,
+            "ticket_number": existing_ticket_number,
             "ticket_summary": None,
             "final_response": "",
             "agent_trajectory": [],
-            "confidence_score": 0.5
+            "confidence_score": 0.5,
+            "existing_ticket_number": existing_ticket_number
         }
 
         # Use LangGraph if available
@@ -114,7 +121,7 @@ class SupportAgentGraph:
         intent = state.get("intent", "rag_query")
         if intent in ["escalation_request", "complaint"]:
             state = await escalation_agent.run(state)
-        elif intent in ["greeting", "casual_chat", "out_of_domain"]:
+        elif intent in ["greeting", "casual_chat", "out_of_domain", "session_query"]:
             pass  # Skips RAG and escalation; directly formats response
         else:
             state = await rag_agent.run(state)

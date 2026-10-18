@@ -44,14 +44,39 @@ async def process_chat_message(
     db.add(user_msg_record)
     await db.flush()
 
-    # 3. Retrieve conversation history from Redis/memory
+    # 3. Retrieve conversation history from Redis/memory (with DB fallback)
     history = session_memory.get_history(session_id)
+    if not history:
+        msg_stmt = (
+            select(ChatMessage)
+            .where(ChatMessage.session_id == session_id)
+            .order_by(ChatMessage.created_at.asc())
+        )
+        msg_res = await db.execute(msg_stmt)
+        db_messages = msg_res.scalars().all()
+        # Exclude the current turn user message we just flushed
+        for m in db_messages[:-1]:
+            history.append({
+                "role": "user" if m.sender == "user" else "assistant",
+                "content": m.content
+            })
+
+    # Check if this session already has an active support ticket
+    existing_ticket_stmt = (
+        select(Ticket)
+        .where(Ticket.session_id == session_id)
+        .order_by(Ticket.created_at.desc())
+    )
+    existing_ticket_res = await db.execute(existing_ticket_stmt)
+    existing_ticket = existing_ticket_res.scalars().first()
+    existing_ticket_number = existing_ticket.ticket_number if existing_ticket else None
 
     # 4. Execute Multi-Agent Graph
     agent_output = await agent_graph.execute(
         session_id=session_id,
         user_message=user_message,
-        history=history
+        history=history,
+        existing_ticket_number=existing_ticket_number
     )
 
     final_response = agent_output.get("final_response", "")
@@ -59,7 +84,7 @@ async def process_chat_message(
     sentiment_score = agent_output.get("sentiment_score", 0.5)
     intent = agent_output.get("intent", "general_inquiry")
     escalation_required = agent_output.get("escalation_required", False)
-    ticket_number = agent_output.get("ticket_number")
+    ticket_number = agent_output.get("ticket_number") or existing_ticket_number
     confidence_score = agent_output.get("confidence_score", 0.5)
     trajectory = agent_output.get("agent_trajectory", [])
     retrieved_docs = agent_output.get("retrieved_docs", [])
@@ -69,13 +94,8 @@ async def process_chat_message(
     user_msg_record.sentiment_score = sentiment_score
     user_msg_record.intent = intent
 
-    # 5. If escalated, persist Ticket in PostgreSQL
+    # 5. If escalated, persist Ticket in PostgreSQL (or update existing)
     if escalation_required and ticket_number:
-        # Check if ticket already created for this session
-        ticket_stmt = select(Ticket).where(Ticket.ticket_number == ticket_number)
-        ticket_res = await db.execute(ticket_stmt)
-        existing_ticket = ticket_res.scalars().first()
-
         if not existing_ticket:
             new_ticket = Ticket(
                 ticket_number=ticket_number,
@@ -91,6 +111,9 @@ async def process_chat_message(
             db.add(new_ticket)
             session_obj.status = "escalated"
             logger.info(f"Saved escalated Ticket #{ticket_number} to PostgreSQL.")
+        else:
+            existing_ticket.details += f"\nFollow-up: {user_message}"
+            logger.info(f"Appended follow-up to existing Ticket #{existing_ticket.ticket_number} for session {session_id}.")
 
     # 6. Save assistant response to PostgreSQL
     assistant_msg_record = ChatMessage(

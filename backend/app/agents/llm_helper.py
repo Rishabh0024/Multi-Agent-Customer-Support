@@ -74,22 +74,34 @@ class LLMHelper:
                     full_prompt += f"System Instructions:\n{system_instruction}\n\n"
                 full_prompt += "\n".join(chat_content)
 
-                model_instance = genai.GenerativeModel(
-                    model_name=settings.GEMINI_MODEL,
-                    generation_config=generation_config
-                )
-                response = await model_instance.generate_content_async(full_prompt)
-                try:
-                    if hasattr(response, "text") and response.text:
-                        return response.text.strip()
-                except Exception:
-                    pass
-                if hasattr(response, "candidates") and response.candidates:
-                    first = response.candidates[0]
-                    if hasattr(first, "content") and first.content and hasattr(first.content, "parts"):
-                        parts_text = "".join(getattr(p, "text", "") for p in first.content.parts)
-                        if parts_text.strip():
-                            return parts_text.strip()
+                candidate_models = [settings.GEMINI_MODEL, "gemini-flash-latest", "gemini-3.8-flash", "models/gemini-2.5-flash-lite"]
+                # Deduplicate preserving order
+                unique_models = []
+                for m in candidate_models:
+                    if m and m not in unique_models:
+                        unique_models.append(m)
+
+                for model_name in unique_models:
+                    try:
+                        model_instance = genai.GenerativeModel(
+                            model_name=model_name,
+                            generation_config=generation_config
+                        )
+                        response = await model_instance.generate_content_async(full_prompt)
+                        try:
+                            if hasattr(response, "text") and response.text:
+                                return response.text.strip()
+                        except Exception:
+                            pass
+                        if hasattr(response, "candidates") and response.candidates:
+                            first = response.candidates[0]
+                            if hasattr(first, "content") and first.content and hasattr(first.content, "parts"):
+                                parts_text = "".join(getattr(p, "text", "") for p in first.content.parts)
+                                if parts_text.strip():
+                                    return parts_text.strip()
+                    except Exception as model_err:
+                        logger.warning(f"Gemini model {model_name} failed: {model_err}. Trying next candidate...")
+                        continue
                 return None
             except Exception as e:
                 logger.error(f"Google Gemini generation failed: {e}. Trying fallback...")

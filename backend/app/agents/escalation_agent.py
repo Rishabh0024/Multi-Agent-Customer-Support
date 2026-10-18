@@ -22,7 +22,16 @@ class EscalationAgent:
                 "agent_trajectory": trajectory
             }
 
-        ticket_number = self._generate_ticket_number()
+        existing_ticket = state.get("existing_ticket_number")
+        if existing_ticket:
+            ticket_number = existing_ticket
+            summary = f"Customer follow-up on existing ticket: {user_message[:100]}"
+            logger.info(f"[EscalationAgent] Reusing existing Ticket #{ticket_number} for session {state.get('session_id')}")
+        else:
+            ticket_number = self._generate_ticket_number()
+            summary = f"Customer inquiry requiring human attention: {user_message[:100]}"
+            logger.info(f"[EscalationAgent] Escalated to new Ticket #{ticket_number}")
+
         sentiment_score = state.get("sentiment_score", 0.5)
         user_message = state["user_message"]
 

@@ -34,31 +34,52 @@ Guidelines:
 
         # 1. Greetings
         if intent == "greeting":
-            if history:
+            lower_msg = user_message.lower()
+            if any(w in lower_msg for w in ["namaste", "namaskar", "kaise ho", "kya haal"]):
+                final_response = "नमस्ते! कस्टमर सपोर्ट में आपका स्वागत है। मैं आपके आर्डर, रिटर्न, वारंटी, शिपिंग और अकाउंट से जुड़े सवालों में सहायता के लिए यहाँ हूँ। आज मैं आपकी क्या मदद करूँ?"
+            elif history:
                 final_response = "Hello again! How can I continue assisting you with your support inquiry today?"
             else:
                 final_response = "Hello! Welcome to Customer Support. I'm here to assist you with orders, returns, warranty, shipping, and account inquiries. How can I help you today?"
 
-        # 2. Casual chit-chat / gratitude
+        # 2. Session / Ticket Queries (e.g. "what is my ticket number?", "mera ticket no kya hai?")
+        elif intent == "session_query":
+            active_ticket = state.get("ticket_number") or state.get("existing_ticket_number")
+            if active_ticket:
+                final_response = (
+                    f"Aapka active support ticket number **#{active_ticket}** hai.\n\n"
+                    f"Hamari customer support leadership aur human specialists is ticket ko review kar rahe hain aur jald hi aapse sampark karenge."
+                )
+            else:
+                final_response = (
+                    "Aapke is chat session me abhi tak koi support ticket generate nahi hua hai.\n\n"
+                    "Agar aapko human support specialist se baat karni hai, to kripya batayein, main aapke liye support ticket open kar dunga."
+                )
+
+        # 3. Casual chit-chat / gratitude / language preferences
         elif intent == "casual_chat":
             lower_msg = user_message.lower()
-            if any(w in lower_msg for w in ["thank", "thx"]):
-                final_response = "You're very welcome! Please let me know if there's anything else I can assist you with regarding your order, warranty, or account."
-            elif any(w in lower_msg for w in ["how are you", "how are you doing"]):
-                final_response = "I'm doing well, thank you for asking! How can I help you today with your orders, products, or account?"
-            elif any(w in lower_msg for w in ["who are you", "what can you do"]):
-                final_response = "I am your AI Customer Support Assistant! I can help you check policies, track shipments, guide you through returns and warranty claims, or connect you with human specialists."
+            if any(w in lower_msg for w in ["hindi", "talk in hindi", "speak in hindi", "hindi me"]):
+                final_response = "हाँ बिल्कुल! मैं आपसे हिंदी में बात कर सकता हूँ। कृपया बताइये मैं आपके आर्डर, डिलीवरी, रिटर्न, वारंटी या अकाउंट में आपकी क्या सहायता करूँ?"
+            elif any(w in lower_msg for w in ["acha", "achha", "theek hai", "thik h", "theek h", "sahi hai", "haan"]):
+                final_response = "जी बिल्कुल! अगर आपको किसी आर्डर, रिटर्न या वारंटी के बारे में कोई और सवाल पूछना है, तो कृपया बताइये।"
+            elif any(w in lower_msg for w in ["thank", "thx", "shukriya", "dhanyawad"]):
+                final_response = "You're very welcome! (आपका बहुत-बहुत स्वागत है!) Please let me know if there's anything else I can assist you with."
+            elif any(w in lower_msg for w in ["how are you", "how are you doing", "kaise ho", "kya haal hai"]):
+                final_response = "I'm doing well, thank you for asking! (मैं बिल्कुल ठीक हूँ!) How can I help you today with your orders, products, or account?"
+            elif any(w in lower_msg for w in ["who are you", "what can you do", "kya kar sakte ho"]):
+                final_response = "I am your AI Customer Support Assistant! Main aapke orders check karne, shipments track karne, returns, warranty claims guide karne, aur human support specialists se connect karne me madad kar sakta hoon."
             else:
                 final_response = "Have a great day! Don't hesitate to reach back out if you need any assistance with our services."
 
-        # 3. Out of domain questions
+        # 4. Out of domain questions
         elif intent == "out_of_domain":
             final_response = (
-                "I am dedicated specifically to customer support for our store (assisting with orders, shipping, returns, warranty, billing, and account help). "
-                "I'm unable to assist with topics outside this domain. Please let me know if there's anything related to our store or your orders I can help with!"
+                "Main yahan sirf hamare store ke orders, shipping, delivery, return, refund, warranty aur account se judi cheezon me aapki madad kar sakta hoon. "
+                "Main dusre vishayon (jaise coding, trivia, etc.) me help nahi kar sakta. Kripya apne order ya service se juda koi sawaal poochhein!"
             )
 
-        # 4. Human Escalation Ticket Created
+        # 5. Human Escalation Ticket Created
         elif escalation_required and ticket_number:
             prefix = ""
             if sentiment_label in ["angry", "frustrated"]:
@@ -70,18 +91,24 @@ Guidelines:
                 f"Our human support specialists have been notified with the highest priority and will review this conversation to assist you promptly."
             )
 
-        # 5. Support Query / RAG Answer
+        # 6. Support Query / RAG Answer
         else:
             final_response = raw_answer
 
-        # If LLM available, use it for empathetic polishing when appropriate
-        if llm_helper.client and (sentiment_label in ["angry", "frustrated"] and not ticket_number):
+        # If LLM available, polish with language awareness
+        if llm_helper.client and (intent in ["casual_chat", "rag_query", "greeting"] or sentiment_label in ["angry", "frustrated"]):
             prompt_content = f"""
 Customer Sentiment: {sentiment_label}
-Raw Answer: {final_response}
+Intent: {intent}
+Active Ticket: {ticket_number}
+Draft Response: {final_response}
 User Message: {user_message}
+Recent History: {json.dumps(history[-3:]) if history else 'None'}
 
-Refine the customer response with genuine empathy and professional tone:
+Refine the response:
+1. MATCH USER'S LANGUAGE: If user wrote in Hindi or Hinglish, response MUST be in natural, polite Hindi/Hinglish! If in English, reply in English.
+2. If user asked a language preference question ('can you talk in hindi', 'hindi me baat karo'), enthusiastically confirm in Hindi and invite their question.
+3. Keep the tone helpful, professional, and natural.
 """
             messages = [
                 {"role": "system", "content": self.SYSTEM_PROMPT},

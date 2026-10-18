@@ -17,3 +17,4 @@ class AgentState(TypedDict):
     final_response: str
     agent_trajectory: List[str]
     confidence_score: float
+    existing_ticket_number: Optional[str]
