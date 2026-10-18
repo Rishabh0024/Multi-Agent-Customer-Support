@@ -65,6 +65,11 @@ app.include_router(ticket_router)
 app.include_router(knowledge_router)
 app.include_router(health_router)
 
+@app.get("/api/ping", tags=["Health & Status"])
+@app.head("/api/ping", tags=["Health & Status"])
+async def ping_alias():
+    return {"status": "awake", "service": "customer-support-api"}
+
 @app.get("/", tags=["Root"])
 async def root(request: Request):
     client_ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "unknown")

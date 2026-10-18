@@ -2,7 +2,11 @@ import axios from 'axios';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChatResponse, Ticket, TicketStats, KnowledgeDoc } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+let rawApiUrl = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/+$/, '');
+if (rawApiUrl.endsWith('/api')) {
+  rawApiUrl = rawApiUrl.substring(0, rawApiUrl.length - 4);
+}
+const API_BASE_URL = rawApiUrl;
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
