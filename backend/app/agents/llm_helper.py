@@ -8,6 +8,10 @@ class LLMHelper:
         self.openai_client = None
         self.gemini_model = None
         self.has_llm = False
+        self.active_model_name: Optional[str] = None
+        self.last_error: Optional[str] = None
+        self.last_notice: Optional[str] = None
+        self.failed_models: List[str] = []
         self._init_providers()
 
     def _init_providers(self):
@@ -18,8 +22,10 @@ class LLMHelper:
                 genai.configure(api_key=settings.GEMINI_API_KEY)
                 self.gemini_model = genai.GenerativeModel(settings.GEMINI_MODEL)
                 self.has_llm = True
+                self.active_model_name = settings.GEMINI_MODEL
                 logger.info(f"Google Gemini LLM initialized with model {settings.GEMINI_MODEL}")
             except Exception as e:
+                self.last_error = f"Gemini init error: {e}"
                 logger.warning(f"Could not initialize Google Gemini client: {e}")
 
         # 2. OpenAI Alternative
@@ -28,8 +34,10 @@ class LLMHelper:
                 from openai import AsyncOpenAI
                 self.openai_client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
                 self.has_llm = True
+                self.active_model_name = settings.LLM_MODEL
                 logger.info(f"OpenAI LLM initialized with model {settings.LLM_MODEL}")
             except Exception as e:
+                self.last_error = f"OpenAI init error: {e}"
                 logger.warning(f"Could not initialize OpenAI client: {e}")
 
     @property
@@ -45,6 +53,9 @@ class LLMHelper:
         response_format: Optional[Dict[str, str]] = None
     ) -> Optional[str]:
         """Calls Google Gemini or OpenAI Chat Completion."""
+        self.last_error = None
+        self.failed_models = []
+
         # 1. Prefer Gemini if configured
         if self.gemini_model:
             try:
@@ -88,22 +99,36 @@ class LLMHelper:
                             generation_config=generation_config
                         )
                         response = await model_instance.generate_content_async(full_prompt)
+                        result_text = None
                         try:
                             if hasattr(response, "text") and response.text:
-                                return response.text.strip()
+                                result_text = response.text.strip()
                         except Exception:
                             pass
-                        if hasattr(response, "candidates") and response.candidates:
+                        if not result_text and hasattr(response, "candidates") and response.candidates:
                             first = response.candidates[0]
                             if hasattr(first, "content") and first.content and hasattr(first.content, "parts"):
                                 parts_text = "".join(getattr(p, "text", "") for p in first.content.parts)
                                 if parts_text.strip():
-                                    return parts_text.strip()
+                                    result_text = parts_text.strip()
+
+                        if result_text:
+                            self.active_model_name = model_name
+                            if self.failed_models:
+                                self.last_notice = f"Failover: {len(self.failed_models)} model(s) unavailable. Switched to '{model_name}'."
+                            else:
+                                self.last_notice = None
+                            self.last_error = None
+                            return result_text
                     except Exception as model_err:
-                        logger.warning(f"Gemini model {model_name} failed: {model_err}. Trying next candidate...")
+                        err_str = str(model_err)
+                        self.failed_models.append(f"{model_name} ({err_str[:60]})")
+                        logger.warning(f"Gemini model {model_name} failed: {err_str}. Trying next candidate...")
                         continue
-                return None
+
+                self.last_error = f"Gemini models failed: {', '.join(self.failed_models)}"
             except Exception as e:
+                self.last_error = f"Gemini generation error: {e}"
                 logger.error(f"Google Gemini generation failed: {e}. Trying fallback...")
 
         # 2. OpenAI Fallback
@@ -119,10 +144,21 @@ class LLMHelper:
                     kwargs["response_format"] = response_format
 
                 response = await self.openai_client.chat.completions.create(**kwargs)
-                return response.choices[0].message.content.strip()
+                content = response.choices[0].message.content.strip()
+                if content:
+                    self.active_model_name = settings.LLM_MODEL
+                    if self.failed_models:
+                        self.last_notice = f"Failover: Gemini unavailable. Switched to OpenAI '{settings.LLM_MODEL}'."
+                    else:
+                        self.last_notice = None
+                    self.last_error = None
+                    return content
             except Exception as e:
+                self.failed_models.append(f"OpenAI {settings.LLM_MODEL} ({str(e)[:60]})")
                 logger.error(f"OpenAI API call failed: {e}")
 
+        self.active_model_name = None
+        self.last_error = f"All LLM models failed: {', '.join(self.failed_models) if self.failed_models else 'No responsive model found'}."
         return None
 
 llm_helper = LLMHelper()

@@ -23,6 +23,9 @@ class ChatResponse(BaseModel):
     confidence_score: float
     agent_trajectory: List[str]
     citations: List[DocumentCitation] = []
+    model_used: Optional[str] = None
+    model_error: Optional[str] = None
+
 
 class MessageHistoryItem(BaseModel):
     id: str

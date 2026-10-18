@@ -13,14 +13,11 @@ Your objective is to provide an accurate, helpful, and natural answer grounded s
 
 Rules:
 1. MATCH USER'S LANGUAGE: If the user asked in Hindi or Hinglish, answer in clear, polite Hindi/Hinglish! If in English, answer in English.
-2. Ground your answer in the provided Documentation Context.
-3. Maintain natural continuity with the Conversation History (e.g., if user asks follow-up questions about a previously mentioned policy, order, or product).
-4. If the documentation context DOES NOT contain the answer or does not fully cover the user's specific request:
-   - State clearly that our official knowledge base does not contain this specific information.
-   - Do NOT invent or hallucinate policies, and do NOT dump irrelevant documentation.
-   - Offer to connect them with a human customer support specialist or open a support ticket.
-5. Keep the response polite, clear, and easy to read using markdown bullet points for conditions or steps.
-6. Mention the source document title at the end.
+2. Ground your answer strictly in the provided Documentation Context.
+3. CRITICAL: If the provided documentation context does NOT directly answer the user's specific question, DO NOT make up policies and DO NOT dump irrelevant documentation! Instead, politely say:
+   "I searched our official documentation, but could not find specific details answering your question. Would you like me to connect you with a customer support specialist or open a support ticket for you?"
+4. Keep the response polite, structured, and easy to read using markdown bullet points for conditions or steps.
+5. Mention the source document title at the end only if you actually used it to answer the question.
 """
 
     async def run(self, state: AgentState) -> AgentState:
@@ -49,7 +46,7 @@ Rules:
         top_score = docs[0].get("score", 0.0) if docs else 0.0
 
         # Check if the retrieved documents are relevant
-        if docs and top_score >= 0.35:
+        if docs and top_score >= 0.40:
             confidence_score = top_score
             context_text = "\n\n".join([
                 f"### Document: {d['title']} (Category: {d.get('category', 'Support')})\n{d['content']}"
@@ -72,18 +69,16 @@ Rules:
                 if res and res.strip():
                     raw_answer = res.strip()
 
-            # Deterministic synthesis ONLY if top score is high and LLM was offline
+            # If LLM failed, STOP answer and show system error instead of dumping random policy docs
             if not raw_answer:
-                if top_score >= 0.50:
-                    top_doc = docs[0]
+                if llm_helper.last_error:
                     raw_answer = (
-                        f"Based on our official **{top_doc['title']}**:\n\n"
-                        f"{top_doc['content']}\n\n"
-                        f"*Source: {top_doc['title']} ({top_doc.get('category', 'Support')})*"
+                        f"⚠️ **System Alert (LLM Unavailable):** Language model generation fail ho gaya ({llm_helper.last_error}).\n\n"
+                        "Aprasangik (irrelevant) information ya hallucination se bachne ke liye answer ko yahin rok diya gaya hai. Kripya kuch samay baad punah prayaas karein ya hamare human support specialist se connect karne ke liye kahein."
                     )
                 else:
                     raw_answer = (
-                        "I searched our official documentation, but I couldn't find specific details directly answering your question in our current knowledge base.\n\n"
+                        "I searched our official knowledge base, but I couldn't find specific documentation directly answering your inquiry.\n\n"
                         "Since this requires specialized assistance, I would be glad to open a support ticket and connect you with a human customer support specialist. Would you like me to open a support ticket for you?"
                     )
         else:
@@ -98,7 +93,9 @@ Rules:
             "retrieved_docs": docs,
             "raw_answer": raw_answer,
             "confidence_score": round(confidence_score, 2),
-            "agent_trajectory": trajectory
+            "agent_trajectory": trajectory,
+            "model_used": llm_helper.active_model_name,
+            "model_error": llm_helper.last_error or getattr(llm_helper, "last_notice", None)
         }
 
 rag_agent = RAGAgent()

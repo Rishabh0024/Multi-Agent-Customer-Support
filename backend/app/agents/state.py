@@ -1,7 +1,7 @@
 from typing import List, Dict, Any, Optional
 from typing_extensions import TypedDict
 
-class AgentState(TypedDict):
+class AgentState(TypedDict, total=False):
     session_id: str
     user_message: str
     history: List[Dict[str, str]]
@@ -18,3 +18,6 @@ class AgentState(TypedDict):
     agent_trajectory: List[str]
     confidence_score: float
     existing_ticket_number: Optional[str]
+    model_used: Optional[str]
+    model_error: Optional[str]
+

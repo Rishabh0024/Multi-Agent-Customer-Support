@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bot, User, ThumbsUp, ThumbsDown, GitFork, BookOpen, Check } from 'lucide-react';
+import { Bot, User, ThumbsUp, ThumbsDown, GitFork, BookOpen, Check, Cpu, AlertTriangle } from 'lucide-react';
 import { ChatMessage, DocumentCitation } from '../../types';
 import { SentimentBadge } from './SentimentBadge';
 import { useSubmitFeedback } from '../../services/api';
@@ -38,8 +38,15 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({ message, sessi
       <div className={`flex flex-col max-w-[92%] sm:max-w-[80%] ${isAssistant ? 'items-start' : 'items-end'}`}>
         {/* Header Details for Assistant */}
         {isAssistant && (
-          <div className="mb-1 flex flex-wrap items-center gap-1.5 sm:gap-2">
+          <div className="mb-1.5 flex flex-wrap items-center gap-1.5 sm:gap-2">
             <span className="text-[11px] sm:text-xs font-semibold text-slate-800">Support AI</span>
+
+            {/* Active Model Badge */}
+            <span className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] sm:text-[11px] font-mono font-medium text-indigo-700 border border-indigo-200/80">
+              <Cpu className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-indigo-600" />
+              {message.model_used || 'gemini-flash-latest'}
+            </span>
+
             {message.sentiment && (
               <SentimentBadge label={message.sentiment} score={message.sentiment_score ?? 0.5} />
             )}
@@ -48,6 +55,19 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({ message, sessi
                 {message.intent}
               </span>
             )}
+          </div>
+        )}
+
+        {/* Model Error / Failover Alert Card */}
+        {isAssistant && message.model_error && (
+          <div className="mb-2 w-full rounded-xl border border-amber-200 bg-amber-50/90 p-2.5 text-xs text-amber-900 shadow-xs">
+            <div className="flex items-center gap-1.5 font-bold text-amber-950 text-[11px] sm:text-xs">
+              <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+              <span>Model Failover / System Alert</span>
+            </div>
+            <p className="mt-1 text-[10px] sm:text-[11px] text-amber-800 font-mono leading-relaxed">
+              {message.model_error}
+            </p>
           </div>
         )}
 

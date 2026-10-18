@@ -1,4 +1,4 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from app.agents.state import AgentState
 from app.agents.coordinator_agent import coordinator_agent
 from app.agents.sentiment_agent import sentiment_agent
@@ -103,7 +103,9 @@ class SupportAgentGraph:
             "final_response": "",
             "agent_trajectory": [],
             "confidence_score": 0.5,
-            "existing_ticket_number": existing_ticket_number
+            "existing_ticket_number": existing_ticket_number,
+            "model_used": None,
+            "model_error": None
         }
 
         # Use LangGraph if available

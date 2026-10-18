@@ -79,6 +79,8 @@ export const ChatWindow: React.FC = () => {
         intent: response.intent,
         agent_trajectory: response.agent_trajectory,
         citations: response.citations,
+        model_used: response.model_used,
+        model_error: response.model_error,
         created_at: new Date().toISOString(),
       };
 
@@ -87,11 +89,13 @@ export const ChatWindow: React.FC = () => {
       if (response.escalation_required && response.ticket_number) {
         setEscalatedTicket(response.ticket_number);
       }
-    } catch (error) {
+    } catch (error: any) {
+      const errDetail = error?.response?.data?.detail || error?.message || 'Connection failure';
       const errorMsg: ChatMessage = {
         id: `err_${Date.now()}`,
         sender: 'assistant',
-        content: 'I apologize, but I encountered an error communicating with our services. Please try again or refresh the page.',
+        content: '⚠️ **System Error:** Hamare backend ya AI model service se communicate karne me error aaya hai. Hallucination se bachne ke liye answer ko yahin rok diya gaya hai.',
+        model_error: `Network/Server Error: ${errDetail}`,
         created_at: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, errorMsg]);

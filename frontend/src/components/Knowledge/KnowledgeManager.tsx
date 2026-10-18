@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpen, Plus, Trash2, Search, Sparkles, Database, X } from 'lucide-react';
+import { BookOpen, Plus, Trash2, Search, Sparkles, Database, X, Loader2, AlertCircle } from 'lucide-react';
 import { useKnowledgeDocs, useIndexKnowledgeDoc, useDeleteKnowledgeDoc, apiClient } from '../../services/api';
 
 export const KnowledgeManager: React.FC = () => {
@@ -16,6 +16,11 @@ export const KnowledgeManager: React.FC = () => {
   const [testQuery, setTestQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[] | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+
+  // Filter state for indexed articles list
+  const [filterQuery, setFilterQuery] = useState('');
+  const [filterCategory, setFilterCategory] = useState('All');
 
   const handleAddDocument = (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,21 +43,37 @@ export const KnowledgeManager: React.FC = () => {
   };
 
   const handleTestSearch = async () => {
-    if (!testQuery.trim()) return;
+    if (!testQuery.trim()) {
+      setSearchError('Please enter a query to search vectors in Qdrant.');
+      return;
+    }
     setIsSearching(true);
+    setSearchError(null);
     try {
       const { data } = await apiClient.post('/api/knowledge/search', {
         query: testQuery.trim(),
         limit: 4,
       });
       setSearchResults(data.results || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Search error:', error);
+      const errMsg = error?.response?.data?.detail || error?.message || 'Qdrant vector search failed';
+      setSearchError(errMsg);
       setSearchResults([]);
     } finally {
       setIsSearching(false);
     }
   };
+
+  const filteredDocs = (docs || []).filter((doc) => {
+    const matchesCategory = filterCategory === 'All' || doc.category === filterCategory;
+    const matchesSearch =
+      !filterQuery.trim() ||
+      doc.title.toLowerCase().includes(filterQuery.toLowerCase()) ||
+      doc.content.toLowerCase().includes(filterQuery.toLowerCase()) ||
+      doc.category.toLowerCase().includes(filterQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
 
   return (
     <div className="space-y-6">
@@ -183,13 +204,21 @@ export const KnowledgeManager: React.FC = () => {
           </div>
           <button
             onClick={handleTestSearch}
-            disabled={isSearching || !testQuery.trim()}
+            disabled={isSearching}
             className="flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors shadow-sm"
           >
-            <Search className="h-4 w-4" />
+            {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
             <span>{isSearching ? 'Searching...' : 'Search Qdrant'}</span>
           </button>
         </div>
+
+        {/* Search Error Alert */}
+        {searchError && (
+          <div className="mt-3 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50/90 p-2.5 text-xs text-rose-800">
+            <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+            <span>{searchError}</span>
+          </div>
+        )}
 
         {/* Search Results Display */}
         {searchResults && (
@@ -221,19 +250,76 @@ export const KnowledgeManager: React.FC = () => {
       </div>
 
       {/* Indexed Documents Grid */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-          <Database className="h-4 w-4 text-slate-500" />
-          Indexed Articles in PostgreSQL & Qdrant ({docs?.length ?? 0})
-        </h3>
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+            <Database className="h-4 w-4 text-slate-500" />
+            Indexed Articles in PostgreSQL & Qdrant ({filteredDocs.length} of {docs?.length ?? 0})
+          </h3>
+
+          {/* Real-time Search & Filter Input */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative min-w-[200px] sm:min-w-[240px]">
+              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+              <input
+                type="text"
+                value={filterQuery}
+                onChange={(e) => setFilterQuery(e.target.value)}
+                placeholder="Search articles by title or keyword..."
+                className="w-full rounded-xl border border-slate-300 bg-white pl-8 pr-7 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:outline-none shadow-2xs"
+              />
+              {filterQuery && (
+                <button
+                  type="button"
+                  onClick={() => setFilterQuery('')}
+                  className="absolute right-2 top-2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+
+            <select
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+              className="rounded-xl border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-sky-500 focus:outline-none shadow-2xs"
+            >
+              <option value="All">All Categories</option>
+              <option value="Orders & Tracking">Orders & Tracking</option>
+              <option value="Shipping & Logistics">Shipping & Logistics</option>
+              <option value="Returns & Refunds">Returns & Refunds</option>
+              <option value="Warranty & Hardware Repairs">Warranty & Hardware Repairs</option>
+              <option value="Billing & Invoices">Billing & Invoices</option>
+              <option value="Account & Security">Account & Security</option>
+            </select>
+          </div>
+        </div>
 
         {isLoading ? (
-          <div className="text-center py-8 text-xs text-slate-400">Loading documents...</div>
-        ) : !docs || docs.length === 0 ? (
-          <div className="text-center py-8 text-xs text-slate-400">No documents found.</div>
+          <div className="text-center py-8 text-xs text-slate-400 flex items-center justify-center gap-2">
+            <Loader2 className="animate-spin h-4 w-4 text-sky-600" />
+            <span>Loading documents...</span>
+          </div>
+        ) : filteredDocs.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-xs text-slate-500">
+            {docs && docs.length > 0 ? (
+              <div>
+                <p className="font-semibold text-slate-700">No matching articles found.</p>
+                <p className="mt-1 text-slate-400">Try adjusting your search query or category filter.</p>
+                <button
+                  onClick={() => { setFilterQuery(''); setFilterCategory('All'); }}
+                  className="mt-2 text-xs font-semibold text-sky-600 hover:underline"
+                >
+                  Clear Filters
+                </button>
+              </div>
+            ) : (
+              'No documents found in knowledge base.'
+            )}
+          </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {docs.map((doc) => (
+            {filteredDocs.map((doc) => (
               <div
                 key={doc.id}
                 className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-xs hover:border-slate-300 transition-all"

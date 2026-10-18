@@ -1,3 +1,5 @@
+import json
+from typing import Optional, Dict, Any, List
 from app.agents.state import AgentState
 from app.agents.llm_helper import llm_helper
 from app.core.logging import logger
@@ -95,9 +97,10 @@ Guidelines:
         else:
             final_response = raw_answer
 
-        # If LLM available, polish with language awareness
+        # If LLM available, polish with language awareness (skip if system alert was generated)
         if llm_helper.client and (intent in ["casual_chat", "rag_query", "greeting"] or sentiment_label in ["angry", "frustrated"]):
-            prompt_content = f"""
+            if "⚠️ **System Alert" not in final_response:
+                prompt_content = f"""
 Customer Sentiment: {sentiment_label}
 Intent: {intent}
 Active Ticket: {ticket_number}
@@ -110,13 +113,13 @@ Refine the response:
 2. If user asked a language preference question ('can you talk in hindi', 'hindi me baat karo'), enthusiastically confirm in Hindi and invite their question.
 3. Keep the tone helpful, professional, and natural.
 """
-            messages = [
-                {"role": "system", "content": self.SYSTEM_PROMPT},
-                {"role": "user", "content": prompt_content}
-            ]
-            res = await llm_helper.generate_chat_completion(messages)
-            if res and res.strip():
-                final_response = res.strip()
+                messages = [
+                    {"role": "system", "content": self.SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt_content}
+                ]
+                res = await llm_helper.generate_chat_completion(messages)
+                if res and res.strip():
+                    final_response = res.strip()
 
         # Fallback safeguard
         if not final_response:
@@ -126,7 +129,9 @@ Refine the response:
         return {
             **state,
             "final_response": final_response,
-            "agent_trajectory": trajectory
+            "agent_trajectory": trajectory,
+            "model_used": llm_helper.active_model_name,
+            "model_error": llm_helper.last_error or getattr(llm_helper, "last_notice", None)
         }
 
 response_agent = ResponseAgent()

@@ -153,7 +153,9 @@ async def process_chat_message(
         ticket_number=ticket_number,
         confidence_score=confidence_score,
         agent_trajectory=trajectory,
-        citations=citations
+        citations=citations,
+        model_used=agent_output.get("model_used"),
+        model_error=agent_output.get("model_error")
     )
 
 @router.get("/{session_id}/history")

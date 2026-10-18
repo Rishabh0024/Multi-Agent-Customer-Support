@@ -13,6 +13,8 @@ export interface ChatMessage {
   intent?: string;
   agent_trajectory?: string[];
   citations?: DocumentCitation[];
+  model_used?: string | null;
+  model_error?: string | null;
   created_at: string;
 }
 
@@ -27,6 +29,8 @@ export interface ChatResponse {
   confidence_score: number;
   agent_trajectory: string[];
   citations: DocumentCitation[];
+  model_used?: string | null;
+  model_error?: string | null;
 }
 
 export interface Ticket {
