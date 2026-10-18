@@ -38,8 +38,11 @@ class SupportAgentGraph:
 
             # Conditional routing based on user intent
             def route_after_sentiment(state: AgentState) -> str:
-                if state.get("intent") == "escalation_request":
+                intent = state.get("intent")
+                if intent in ["escalation_request", "complaint"]:
                     return "escalation"
+                elif intent in ["greeting", "casual_chat", "out_of_domain"]:
+                    return "formatter"
                 return "rag"
 
             workflow.add_conditional_edges(
@@ -47,6 +50,7 @@ class SupportAgentGraph:
                 route_after_sentiment,
                 {
                     "escalation": "escalation",
+                    "formatter": "formatter",
                     "rag": "rag"
                 }
             )
@@ -107,8 +111,11 @@ class SupportAgentGraph:
         state = await coordinator_agent.run(initial_state)
         state = await sentiment_agent.run(state)
 
-        if state.get("intent") == "escalation_request":
+        intent = state.get("intent", "rag_query")
+        if intent in ["escalation_request", "complaint"]:
             state = await escalation_agent.run(state)
+        elif intent in ["greeting", "casual_chat", "out_of_domain"]:
+            pass  # Skips RAG and escalation; directly formats response
         else:
             state = await rag_agent.run(state)
             if state.get("escalation_required", False):

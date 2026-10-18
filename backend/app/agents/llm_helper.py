@@ -79,7 +79,18 @@ class LLMHelper:
                     generation_config=generation_config
                 )
                 response = await model_instance.generate_content_async(full_prompt)
-                return response.text.strip()
+                try:
+                    if hasattr(response, "text") and response.text:
+                        return response.text.strip()
+                except Exception:
+                    pass
+                if hasattr(response, "candidates") and response.candidates:
+                    first = response.candidates[0]
+                    if hasattr(first, "content") and first.content and hasattr(first.content, "parts"):
+                        parts_text = "".join(getattr(p, "text", "") for p in first.content.parts)
+                        if parts_text.strip():
+                            return parts_text.strip()
+                return None
             except Exception as e:
                 logger.error(f"Google Gemini generation failed: {e}. Trying fallback...")
 

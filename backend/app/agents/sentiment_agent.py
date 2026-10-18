@@ -54,11 +54,20 @@ Respond ONLY in JSON format:
             sentiment_score = 0.5
             sentiment_label = "neutral"
 
-        if state.get("intent") == "greeting":
+        if state.get("intent") in ["greeting", "casual_chat"]:
             return {
                 **state,
                 "sentiment_label": "positive",
                 "sentiment_score": 0.85,
+                "escalation_required": False,
+                "agent_trajectory": trajectory
+            }
+
+        if state.get("intent") == "out_of_domain":
+            return {
+                **state,
+                "sentiment_label": "neutral",
+                "sentiment_score": 0.50,
                 "escalation_required": False,
                 "agent_trajectory": trajectory
             }
