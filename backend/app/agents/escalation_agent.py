@@ -22,6 +22,9 @@ class EscalationAgent:
                 "agent_trajectory": trajectory
             }
 
+        user_message = state.get("user_message", "")
+        sentiment_score = state.get("sentiment_score", 0.5)
+
         existing_ticket = state.get("existing_ticket_number")
         if existing_ticket:
             ticket_number = existing_ticket
@@ -32,9 +35,6 @@ class EscalationAgent:
             summary = f"Customer inquiry requiring human attention: {user_message[:100]}"
             logger.info(f"[EscalationAgent] Escalated to new Ticket #{ticket_number}")
 
-        sentiment_score = state.get("sentiment_score", 0.5)
-        user_message = state["user_message"]
-
         # Determine priority
         if sentiment_score <= 0.20 or any(w in user_message.lower() for w in ["fraud", "sue", "legal", "stolen", "lost package"]):
             priority = "urgent"
@@ -43,7 +43,6 @@ class EscalationAgent:
         else:
             priority = "medium"
 
-        summary = f"Customer inquiry requiring human attention: {user_message[:100]}"
         logger.info(f"[EscalationAgent] Escalated to Ticket {ticket_number} (Priority: {priority})")
 
         return {

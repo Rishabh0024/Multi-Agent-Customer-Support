@@ -90,3 +90,10 @@ async def search_knowledge(payload: KnowledgeSearchRequest):
     """Tests semantic vector search against Qdrant."""
     results = await qdrant_store.search_similar(payload.query, limit=payload.limit or 4)
     return {"query": payload.query, "results": results}
+
+@router.post("/restore-defaults")
+async def restore_default_knowledge_documents(db: AsyncSession = Depends(get_db_session)):
+    """Restores any missing default knowledge base documents into PostgreSQL and Qdrant."""
+    from app.services.knowledge_ingestion import seed_knowledge_base
+    await seed_knowledge_base(db)
+    return {"status": "success", "message": "Default enterprise knowledge documents verified and restored."}

@@ -71,15 +71,18 @@ Contact support with your proof of purchase (invoice number). If approved, our t
 ]
 
 async def seed_knowledge_base(db: AsyncSession):
-    """Seeds both PostgreSQL and Qdrant with enterprise support documentation."""
+    """Seeds both PostgreSQL and Qdrant with enterprise support documentation and restores any missing docs."""
     try:
-        # Check if DB already has docs
+        # Check existing docs in DB
         result = await db.execute(select(KnowledgeDoc))
         existing_docs = result.scalars().all()
+        existing_titles = {d.title for d in existing_docs}
 
-        if not existing_docs:
-            logger.info("Knowledge base is empty. Seeding initial enterprise support documents...")
-            for item in SAMPLE_KNOWLEDGE_DOCS:
+        missing_docs = [item for item in SAMPLE_KNOWLEDGE_DOCS if item["title"] not in existing_titles]
+
+        if missing_docs:
+            logger.info(f"Found {len(missing_docs)} missing knowledge documents. Seeding into PostgreSQL & Qdrant...")
+            for item in missing_docs:
                 # Add to Qdrant vector store
                 doc_id = await qdrant_store.add_document(
                     title=item["title"],
@@ -98,8 +101,8 @@ async def seed_knowledge_base(db: AsyncSession):
                 db.add(db_doc)
 
             await db.commit()
-            logger.info(f"Successfully seeded {len(SAMPLE_KNOWLEDGE_DOCS)} documents into PostgreSQL and Qdrant.")
+            logger.info(f"Successfully seeded/restored {len(missing_docs)} documents into PostgreSQL and Qdrant.")
         else:
-            logger.info(f"Knowledge base already contains {len(existing_docs)} documents.")
+            logger.info(f"Knowledge base is healthy. All {len(existing_docs)} default documents present.")
     except Exception as e:
         logger.error(f"Error seeding knowledge base: {e}")
