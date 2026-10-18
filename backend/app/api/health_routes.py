@@ -33,3 +33,11 @@ async def check_health():
             "database_engine": "postgresql" if "postgresql" in settings.DATABASE_URL else "sqlite_fallback"
         }
     }
+
+@router.get("/ping")
+@router.head("/ping")
+async def ping_keepalive():
+    """Ultra-lightweight endpoint for keep-alive cron jobs.
+    Zero DB or vector store overhead; keeps Render instances awake with minimal CPU."""
+    return {"status": "awake", "service": "customer-support-api"}
+

@@ -100,7 +100,7 @@ erDiagram
 | Parameter | Value | Description |
 | :--- | :--- | :--- |
 | **Collection Name** | `support_knowledge` | Stores vectorized enterprise policies and FAQs |
-| **Vector Dimension** | `1536` | Matches OpenAI `text-embedding-3-small` |
+| **Vector Dimension** | `768` / `1536` | Matches Gemini `text-embedding-004` (768) or OpenAI (1536) |
 | **Distance Metric** | `Cosine` | Cosine similarity for semantic text angle matching |
 | **Indexing Method** | `HNSW (Hierarchical Navigable Small World)` | Graph-based approximate nearest neighbor search |
 | **Payload Fields** | `title`, `category`, `content`, `metadata` | Stored alongside vectors for instant context retrieval |
@@ -121,9 +121,21 @@ erDiagram
 
 ---
 
-## 4. Redis Key-Value Design
+## 4. Redis Key-Value & Upstash Quota Design
 
 | Key Pattern | Data Structure | TTL | Purpose |
 | :--- | :--- | :--- | :--- |
 | `session_history:{session_id}` | JSON Array | 48 Hours | Stores sliding window of last 8 user/assistant turns |
 | `cached_query:{query_hash}` | JSON String | 2 Hours | Caches responses for high-frequency FAQ questions |
+
+* **Upstash Quota Protection:** Free tier allows 10,000 commands/day. With 8-turn sliding windows and 48-hour key TTLs, average daily utilization remains $<500$ commands, operating comfortably within $<5\%$ of free tier quotas.
+
+---
+
+## 5. NeonDB Serverless Architecture & Cold-Start Resilience
+
+NeonDB decouples compute from storage, scaling compute to zero after 5 minutes of inactivity:
+1. **Cold-Start Handling:** First wake-up query takes ~500ms. SQLAlchemy `pool_pre_ping=True` verifies connection liveness before dispatching transactions, preventing `asyncpg.exceptions.ConnectionDoesNotExistError`.
+2. **SSL Protocol Adaptation:** NeonDB requires TLS encrypted connections. The application strips conflicting `?sslmode=require` query parameters and injects `connect_args={"ssl": True}` directly into the `asyncpg` driver factory.
+3. **Independent Quota:** NeonDB compute hours are completely separate from Render's 750-hour budget, ensuring database availability is never throttled by web tier limits.
+

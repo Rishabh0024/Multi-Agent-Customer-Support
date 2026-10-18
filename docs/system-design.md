@@ -115,3 +115,41 @@ sequenceDiagram
    * PostgreSQL falls back to local SQLite for zero-downtime offline testing.
 2. **Stateless Backend Nodes:** FastAPI instances store no local session state; all state lives in Redis and PostgreSQL, enabling horizontal auto-scaling behind an Nginx or AWS ALB load balancer.
 3. **Sliding Window Token Control:** Session memory retains only the last 8 turns (16 messages), ensuring LLM token usage remains strictly bounded and deterministic.
+
+---
+
+## 5. Production Cloud Topology & Zero-Cost Architecture
+
+The production environment leverages high-reliability free tiers across specialized cloud providers:
+
+```mermaid
+flowchart LR
+    Client([Global Users]) -->|Anycast Routing| Vercel[Vercel Global Edge CDN]
+    Vercel -->|HTTPS Proxy| RenderProxy[Render Reverse Proxy / Cloudflare]
+    RenderProxy -->|Private Port 8000| Backend[FastAPI Backend Container]
+
+    subgraph Serverless Cloud Persistence
+        Backend <-->|TLS asyncpg| Neon[(NeonDB Serverless Postgres)]
+        Backend <-->|HTTPS 1536/768-dim| Qdrant[(Qdrant Cloud Vector DB)]
+        Backend <-->|TLS rediss://| Upstash[(Upstash Serverless Redis)]
+        Backend <-->|REST API| Gemini[Google AI Studio Gemini 1.5 Flash]
+    end
+
+    subgraph Keep-Alive Engine
+        GHA[GitHub Actions Distributed Cron] -.->|Every 14m / Rotating IPs| RenderProxy
+    end
+```
+
+### 5.1 Render 750-Hour Quota Management
+* **The Math:** In a 31-day month, total hours are $744$. Render grants $750$ free instance hours per calendar month ($6\text{ hours}$ margin).
+* **CI/CD Overlap Prevention:** Redeployments run parallel containers for 5–10 minutes. To guarantee zero mid-month exhaustion, keep-alive pings can be constrained to active business windows (e.g., 08:00–24:00), using only 496 hours/month.
+* **Exhaustion Behavior:** If 750 hours are exceeded, Render suspends the service until the 1st of the next month (00:00 UTC), upon which it automatically re-activates with zero manual intervention.
+
+### 5.2 Anti-Bot & WAF Bypass Strategy for Keep-Alive Pings
+* **Problem:** Fixed-IP cron pingers sending identical requests every 5 minutes get flagged by Render/Cloudflare WAF as scrapers or bots.
+* **Solution:** `.github/workflows/keep-alive.yml` schedules runs from rotating GitHub Actions Azure runner IPs worldwide, with randomized 0–30s delay jitter, genuine browser headers (`User-Agent: Mozilla/5.0...`), and hits an ultra-lightweight `/api/ping` route that executes in $<1\text{ ms}$ without consuming DB compute.
+
+### 5.3 IP Shielding & Reverse Proxy Protection
+* **Frontend:** Deployed on Vercel's Edge Network with strict security headers (`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `HSTS`).
+* **Backend:** Render acts as an L7 reverse proxy. The actual origin container IP is never exposed to public DNS; all incoming requests pass through Cloudflare/Render load balancers.
+

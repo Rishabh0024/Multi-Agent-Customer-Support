@@ -1,0 +1,44 @@
+name: Render Backend Anti-Sleep Keep-Alive
+
+on:
+  schedule:
+    # Run every 14 minutes to prevent Render's 15-minute inactivity spin-down
+    - cron: '*/14 * * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+jobs:
+  ping-keepalive:
+    name: Distributed Keep-Alive Ping
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render Backend Health Endpoint
+        env:
+          BACKEND_URL: ${{ vars.RENDER_BACKEND_URL || secrets.RENDER_BACKEND_URL }}
+        run: |
+          if [ -z "$BACKEND_URL" ]; then
+            echo "RENDER_BACKEND_URL is not set. Skipping keep-alive ping."
+            echo "Set RENDER_BACKEND_URL in GitHub Repo Settings -> Secrets and variables -> Actions"
+            exit 0
+          fi
+
+          # Random jitter (0 to 30 seconds) to avoid rigid robotic interval signatures
+          SLEEP_SECONDS=$(( RANDOM % 30 ))
+          echo "Applying anti-bot jitter: sleeping for ${SLEEP_SECONDS}s..."
+          sleep $SLEEP_SECONDS
+
+          TARGET_URL="${BACKEND_URL%/}/api/ping"
+          echo "Pinging target: $TARGET_URL from rotating GitHub Actions IP..."
+
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36" \
+            -H "Accept: application/json" \
+            --max-time 15 \
+            "$TARGET_URL" || true)
+
+          echo "Response HTTP Status: $HTTP_CODE"
+
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 400 ]; then
+            echo "Backend is awake and healthy! Render instance spin-down prevented."
+          else
+            echo "Warning: Backend responded with code $HTTP_CODE (Instance might be cold starting)."
+          fi

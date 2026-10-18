@@ -53,3 +53,7 @@ htmlcov/
 
 # Logs
 *.log
+
+# Private Career / Interview Docs (Keep local only, do not push to GitHub)
+docs/resume-bullets.md
+docs/interview-qa.md
