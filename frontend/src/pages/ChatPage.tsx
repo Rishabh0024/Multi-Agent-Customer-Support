@@ -3,7 +3,7 @@ import { ChatWindow } from '../components/Chat/ChatWindow';
 
 export const ChatPage: React.FC = () => {
   return (
-    <div className="mx-auto max-w-7xl px-0 sm:px-6">
+    <div className="h-full w-full flex flex-col overflow-hidden">
       <ChatWindow />
     </div>
   );

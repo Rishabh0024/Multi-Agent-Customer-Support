@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Bot, User, ThumbsUp, ThumbsDown, GitFork, BookOpen, Check, Cpu, AlertTriangle, RefreshCw, Clock } from 'lucide-react';
 import { ChatMessage, DocumentCitation } from '../../types';
 import { SentimentBadge } from './SentimentBadge';
+import { FormattedMessage } from './FormattedMessage';
 import { useSubmitFeedback } from '../../services/api';
 
 interface ChatMessageItemProps {
@@ -94,13 +95,17 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({ message, sessi
 
         {/* Message Bubble */}
         <div
-          className={`rounded-2xl px-3.5 py-2.5 sm:px-4 sm:py-3 text-xs sm:text-sm leading-relaxed shadow-xs transition-all ${
+          className={`rounded-2xl px-3.5 py-2.5 sm:px-4 sm:py-3.5 text-xs sm:text-sm leading-relaxed transition-all ${
             isAssistant
-              ? 'bg-white text-slate-800 border border-slate-200/90 rounded-tl-sm'
-              : 'bg-sky-600 text-white rounded-tr-sm shadow-sky-600/10'
+              ? 'bg-white text-slate-800 border border-slate-200/80 shadow-xs rounded-tl-sm w-full'
+              : 'bg-gradient-to-r from-sky-600 to-indigo-600 text-white rounded-tr-sm shadow-md shadow-sky-600/10 font-normal'
           }`}
         >
-          <div className="whitespace-pre-wrap">{message.content}</div>
+          {isAssistant ? (
+            <FormattedMessage content={message.content} />
+          ) : (
+            <div className="whitespace-pre-wrap">{message.content}</div>
+          )}
 
           {/* Citations Box */}
           {isAssistant && message.citations && message.citations.length > 0 && (
