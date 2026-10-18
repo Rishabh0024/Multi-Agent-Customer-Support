@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { BookOpen, Plus, Trash2, Search, Sparkles, Database } from 'lucide-react';
-import { useKnowledgeDocs, useIndexKnowledgeDoc, useDeleteKnowledgeDoc } from '../../services/api';
-import axios from 'axios';
+import { BookOpen, Plus, Trash2, Search, Sparkles, Database, X } from 'lucide-react';
+import { useKnowledgeDocs, useIndexKnowledgeDoc, useDeleteKnowledgeDoc, apiClient } from '../../services/api';
 
 export const KnowledgeManager: React.FC = () => {
   const { data: docs, isLoading } = useKnowledgeDocs();
@@ -42,13 +41,14 @@ export const KnowledgeManager: React.FC = () => {
     if (!testQuery.trim()) return;
     setIsSearching(true);
     try {
-      const { data } = await axios.post('/api/knowledge/search', {
+      const { data } = await apiClient.post('/api/knowledge/search', {
         query: testQuery.trim(),
-        limit: 3,
+        limit: 4,
       });
       setSearchResults(data.results || []);
     } catch (error) {
       console.error('Search error:', error);
+      setSearchResults([]);
     } finally {
       setIsSearching(false);
     }
@@ -158,22 +158,36 @@ export const KnowledgeManager: React.FC = () => {
           Type any query to test cosine similarity scoring in Qdrant:
         </p>
 
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={testQuery}
-            onChange={(e) => setTestQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleTestSearch()}
-            placeholder="e.g. Can I get money back for opened boxes?"
-            className="flex-1 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none"
-          />
+        <div className="flex flex-col sm:flex-row gap-2">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              value={testQuery}
+              onChange={(e) => setTestQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleTestSearch()}
+              placeholder="e.g. Can I return opened boxes within 30 days?"
+              className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none pr-8"
+            />
+            {testQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  setTestQuery('');
+                  setSearchResults(null);
+                }}
+                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
           <button
             onClick={handleTestSearch}
-            disabled={isSearching}
-            className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+            disabled={isSearching || !testQuery.trim()}
+            className="flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors shadow-sm"
           >
-            <Search className="h-3.5 w-3.5" />
-            <span>Search Qdrant</span>
+            <Search className="h-4 w-4" />
+            <span>{isSearching ? 'Searching...' : 'Search Qdrant'}</span>
           </button>
         </div>
 

@@ -29,23 +29,23 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({ message, sessi
     <div className={`flex w-full gap-3 py-3 ${isAssistant ? 'justify-start' : 'justify-end'}`}>
       {/* Bot Icon */}
       {isAssistant && (
-        <div className="flex h-9 w-9 shrink-0 select-none items-center justify-center rounded-xl bg-gradient-to-tr from-sky-600 to-indigo-600 text-white shadow-sm">
-          <Bot className="h-5 w-5" />
+        <div className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 select-none items-center justify-center rounded-xl bg-gradient-to-tr from-sky-600 to-indigo-600 text-white shadow-sm mt-0.5">
+          <Bot className="h-4 w-4 sm:h-5 sm:w-5" />
         </div>
       )}
 
       {/* Message Bubble Container */}
-      <div className={`flex flex-col max-w-[85%] sm:max-w-[75%] ${isAssistant ? 'items-start' : 'items-end'}`}>
+      <div className={`flex flex-col max-w-[92%] sm:max-w-[80%] ${isAssistant ? 'items-start' : 'items-end'}`}>
         {/* Header Details for Assistant */}
         {isAssistant && (
-          <div className="mb-1 flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-slate-800">Support AI Agent</span>
+          <div className="mb-1 flex flex-wrap items-center gap-1.5 sm:gap-2">
+            <span className="text-[11px] sm:text-xs font-semibold text-slate-800">Support AI</span>
             {message.sentiment && (
               <SentimentBadge label={message.sentiment} score={message.sentiment_score ?? 0.5} />
             )}
             {message.intent && (
-              <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 border border-slate-200">
-                Intent: {message.intent}
+              <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] sm:text-[11px] font-medium text-slate-600 border border-slate-200">
+                {message.intent}
               </span>
             )}
           </div>
@@ -53,9 +53,9 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({ message, sessi
 
         {/* Message Bubble */}
         <div
-          className={`rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm transition-all ${
+          className={`rounded-2xl px-3.5 py-2.5 sm:px-4 sm:py-3 text-xs sm:text-sm leading-relaxed shadow-xs transition-all ${
             isAssistant
-              ? 'bg-white text-slate-800 border border-slate-200/80 rounded-tl-sm'
+              ? 'bg-white text-slate-800 border border-slate-200/90 rounded-tl-sm'
               : 'bg-sky-600 text-white rounded-tr-sm shadow-sky-600/10'
           }`}
         >

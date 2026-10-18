@@ -54,6 +54,15 @@ Respond ONLY in JSON format:
             sentiment_score = 0.5
             sentiment_label = "neutral"
 
+        if state.get("intent") == "greeting":
+            return {
+                **state,
+                "sentiment_label": "positive",
+                "sentiment_score": 0.85,
+                "escalation_required": False,
+                "agent_trajectory": trajectory
+            }
+
         if state.get("intent") in ["escalation_request", "complaint"]:
             escalation_required = True
             sentiment_score = min(sentiment_score, 0.3)
@@ -61,8 +70,8 @@ Respond ONLY in JSON format:
         elif sentiment_score <= settings.SENTIMENT_ESCALATION_THRESHOLD:
             escalation_required = True
 
-        # Refine with LLM if available
-        if llm_helper.client:
+        # Refine with LLM if available and message has emotional indicators
+        if llm_helper.client and (neg_hits > 0 or pos_hits > 0 or len(lower_msg.split()) > 10):
             messages = [
                 {"role": "system", "content": self.SYSTEM_PROMPT},
                 {"role": "user", "content": f"User Message: {user_message}\nCurrent History: {state.get('history', [])[-2:]}"}

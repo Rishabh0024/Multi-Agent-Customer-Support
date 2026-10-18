@@ -29,14 +29,18 @@ Respond ONLY in JSON format:
         # Rule-based fast heuristics
         intent = "rag_query"
 
-        # Explicit human escalation keywords
-        human_keywords = ["human", "representative", "agent", "real person", "manager", "support executive"]
-        if any(k in lower_msg for k in human_keywords) and len(lower_msg.split()) <= 15:
-            intent = "escalation_request"
-        # Greetings
-        elif lower_msg in ["hi", "hello", "hey", "good morning", "good evening", "namaste"]:
+        # 1. Greetings first
+        greeting_words = ["hi", "hello", "hey", "good morning", "good evening", "good afternoon", "namaste", "help"]
+        if lower_msg in greeting_words or lower_msg.rstrip("!?.") in greeting_words:
             intent = "greeting"
-        # Severe complaints
+        # 2. Explicit human escalation phrases
+        elif any(phrase in lower_msg for phrase in [
+            "talk to human", "speak to human", "real person", "manager",
+            "human representative", "human agent", "escalate to human",
+            "connect to agent", "connect me with human", "transfer to human"
+        ]):
+            intent = "escalation_request"
+        # 3. Severe complaints
         elif any(w in lower_msg for w in ["scam", "fraud", "sue you", "worst service", "lawyer", "consumer court"]):
             intent = "complaint"
         else:

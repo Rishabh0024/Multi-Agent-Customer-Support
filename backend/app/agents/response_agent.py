@@ -30,7 +30,8 @@ Formatting Rules:
         final_response = raw_answer
 
         # If LLM available, use it for empathetic polishing
-        if llm_helper.client:
+        # Only call LLM for polishing if emotion adaptation or escalation formatting is needed
+        if llm_helper.client and (sentiment_label in ["angry", "frustrated"] or escalation_required or not raw_answer):
             prompt_content = f"""
 Customer Sentiment: {sentiment_label}
 Escalation Status: {'Yes, Ticket #' + ticket_number if escalation_required and ticket_number else 'No'}
@@ -46,6 +47,8 @@ Generate the polished final customer response:
             res = await llm_helper.generate_chat_completion(messages)
             if res and res.strip():
                 final_response = res.strip()
+        else:
+            final_response = raw_answer
 
         # Deterministic fallback formatting if LLM was unavailable, failed, or rate-limited
         if not final_response:
@@ -53,11 +56,12 @@ Generate the polished final customer response:
             if sentiment_label in ["angry", "frustrated"]:
                 prefix = "I truly understand your frustration and apologize for the inconvenience this has caused you. "
             
-            body = raw_answer if raw_answer else "I have escalated this issue directly to our customer support leadership."
-            
-            suffix = ""
             if escalation_required and ticket_number:
+                body = raw_answer if raw_answer else "I have escalated this issue directly to our customer support leadership."
                 suffix = f"\n\n---\n📋 **Support Ticket Created: #{ticket_number}**\nOur human support specialists have been notified with the highest priority and will review this conversation to assist you further."
+            else:
+                body = raw_answer if raw_answer else "How may I assist you with your orders, returns, warranty, or account today?"
+                suffix = ""
 
             final_response = f"{prefix}{body}{suffix}".strip()
 

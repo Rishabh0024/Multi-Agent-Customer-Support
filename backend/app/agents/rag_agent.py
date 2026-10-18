@@ -42,14 +42,15 @@ Guidelines:
                     {"role": "user", "content": f"Context:\n{context_text}\n\nUser Question:\n{user_message}"}
                 ]
                 res = await llm_helper.generate_chat_completion(messages)
-                if res:
+                if res and res.strip():
                     raw_answer = res.strip()
-            else:
-                # Deterministic synthesis if LLM offline
+
+            # Deterministic synthesis if LLM is offline or rate-limited
+            if not raw_answer:
                 top_doc = docs[0]
                 raw_answer = (
-                    f"According to our **{top_doc['title']}** ({top_doc['category']}):\n\n"
-                    f"{top_doc['content'][:450]}...\n\n"
+                    f"Based on our official **{top_doc['title']}** ({top_doc.get('category', 'Support')}):\n\n"
+                    f"{top_doc['content']}\n\n"
                     f"*Source: {top_doc['title']}*"
                 )
         else:

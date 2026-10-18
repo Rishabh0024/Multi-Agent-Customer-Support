@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { RotateCcw, LifeBuoy } from 'lucide-react';
+import { RotateCcw, LifeBuoy, AlertCircle } from 'lucide-react';
 import { ChatMessage, ChatResponse } from '../../types';
 import { ChatMessageItem } from './ChatMessageItem';
 import { ChatInput } from './ChatInput';
@@ -27,8 +27,14 @@ export const ChatWindow: React.FC = () => {
   useEffect(() => {
     if (historyData && historyData.length > 0) {
       setMessages(historyData);
+      // Check if any message was escalated
+      const lastEscalated = [...historyData].reverse().find((m) => m.intent === 'escalation_request' || m.content.includes('Support Ticket Created'));
+      if (lastEscalated) {
+        const match = lastEscalated.content.match(/#?TICK-\d+/);
+        if (match) setEscalatedTicket(match[0].replace('#', ''));
+      }
     } else if (messages.length === 0) {
-      // Default welcome message
+      // Default clean welcome message
       setMessages([
         {
           id: 'welcome',
@@ -94,15 +100,16 @@ export const ChatWindow: React.FC = () => {
 
   const handleNewChat = () => {
     const newId = generateSessionId();
+    localStorage.setItem('active_chat_session', newId);
     setSessionId(newId);
     setEscalatedTicket(null);
     setMessages([
       {
         id: 'welcome',
         sender: 'assistant',
-        content: 'Welcome to a new support session! How may I assist you today?',
+        content: 'Welcome to a fresh support session! How may I assist you today?',
         sentiment: 'positive',
-        sentiment_score: 0.8,
+        sentiment_score: 0.85,
         created_at: new Date().toISOString(),
         agent_trajectory: ['CoordinatorAgent', 'ResponseAgent']
       }
@@ -110,64 +117,75 @@ export const ChatWindow: React.FC = () => {
   };
 
   return (
-    <div className="flex h-[calc(100vh-80px)] max-w-5xl mx-auto flex-col rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden my-4">
+    <div className="flex h-[calc(100dvh-112px)] md:h-[calc(100vh-80px)] max-w-5xl mx-auto flex-col rounded-none md:rounded-2xl border-0 md:border border-slate-200 bg-white shadow-none md:shadow-xl overflow-hidden my-0 md:my-4">
       {/* Chat Header */}
-      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/70 px-5 py-3.5 backdrop-blur-sm">
-        <div className="flex items-center gap-3">
-          <div className="flex h-3 w-3 relative">
+      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/80 px-3.5 py-2.5 sm:px-5 sm:py-3 backdrop-blur-sm">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-2.5 w-2.5 relative">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
           </div>
           <div>
-            <h2 className="text-sm font-bold text-slate-800">Support Chat Assistant</h2>
-            <p className="text-xs text-slate-400 font-mono">Session: {sessionId}</p>
+            <h2 className="text-xs sm:text-sm font-bold text-slate-800 flex items-center gap-1.5">
+              Support AI Assistant
+              <span className="hidden sm:inline-flex rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60 text-[10px] px-2 py-0.2">
+                Active
+              </span>
+            </h2>
+            <p className="text-[10px] sm:text-xs text-slate-400 font-mono">
+              Session: <span className="text-slate-600 font-semibold">{sessionId}</span>
+            </p>
           </div>
         </div>
 
         <button
           onClick={handleNewChat}
-          className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
+          title="Start fresh conversation"
+          className="flex items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 px-2.5 py-1.5 sm:px-3 text-xs font-semibold text-sky-700 shadow-xs hover:bg-sky-100 transition-all active:scale-95"
         >
-          <RotateCcw className="h-3.5 w-3.5 text-slate-500" />
-          <span>New Session</span>
+          <RotateCcw className="h-3.5 w-3.5 text-sky-600" />
+          <span>New Chat</span>
         </button>
       </div>
 
       {/* Escalation Notification Bar */}
       {escalatedTicket && (
-        <div className="flex items-center justify-between bg-amber-50 border-b border-amber-200 px-5 py-2.5 text-xs text-amber-800">
+        <div className="flex items-center justify-between bg-amber-50/90 border-b border-amber-200 px-3.5 py-2 sm:px-5 sm:py-2.5 text-xs text-amber-900 animate-fadeIn">
           <div className="flex items-center gap-2">
-            <LifeBuoy className="h-4 w-4 text-amber-600 animate-pulse" />
-            <span>
-              <strong>Ticket #{escalatedTicket} Created:</strong> This conversation has been escalated to our human support desk.
+            <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+            <span className="text-[11px] sm:text-xs">
+              <strong>Ticket #{escalatedTicket}:</strong> Assigned to human support desk.
             </span>
           </div>
-          <span className="rounded bg-amber-200/70 px-2 py-0.5 font-bold uppercase tracking-wider text-[10px]">
-            In Queue
-          </span>
+          <button
+            onClick={handleNewChat}
+            className="text-[11px] text-amber-800 underline font-semibold hover:text-amber-950 shrink-0 ml-2"
+          >
+            Start Fresh Chat
+          </button>
         </div>
       )}
 
       {/* Message History Body */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+      <div className="flex-1 overflow-y-auto px-3 py-3 sm:p-6 space-y-3.5 sm:space-y-4">
         {messages.map((msg) => (
           <ChatMessageItem key={msg.id} message={msg} sessionId={sessionId} />
         ))}
 
         {/* Loading Indicator */}
         {sendMessageMutation.isPending && (
-          <div className="flex w-full gap-3 py-3 justify-start items-center">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-sky-600 to-indigo-600 text-white shadow-sm animate-pulse">
-              <LifeBuoy className="h-5 w-5" />
+          <div className="flex w-full gap-2.5 py-2 justify-start items-center">
+            <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-sky-600 to-indigo-600 text-white shadow-sm animate-pulse">
+              <LifeBuoy className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
-            <div className="rounded-2xl rounded-tl-sm bg-white border border-slate-200 px-4 py-3 text-sm text-slate-500 shadow-sm flex items-center gap-3">
-              <span className="flex space-x-1.5">
+            <div className="rounded-2xl rounded-tl-sm bg-white border border-slate-200 px-3.5 py-2.5 text-xs text-slate-500 shadow-xs flex items-center gap-2.5">
+              <span className="flex space-x-1">
                 <span className="h-2 w-2 bg-sky-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
                 <span className="h-2 w-2 bg-sky-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
                 <span className="h-2 w-2 bg-sky-500 rounded-full animate-bounce"></span>
               </span>
-              <span className="text-xs font-medium text-slate-500 font-mono">
-                Multi-agents collaborating (Coordinator → RAG / Sentiment)...
+              <span className="text-[11px] sm:text-xs font-medium text-slate-500 font-mono">
+                Multi-agents coordinating (LangGraph RAG)...
               </span>
             </div>
           </div>
