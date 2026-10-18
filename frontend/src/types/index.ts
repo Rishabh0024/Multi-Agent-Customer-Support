@@ -14,6 +14,8 @@ export interface ChatMessage {
   agent_trajectory?: string[];
   citations?: DocumentCitation[];
   model_used?: string | null;
+  model_transition?: string | null;
+  pacing_notice?: string | null;
   model_error?: string | null;
   created_at: string;
 }
@@ -30,6 +32,8 @@ export interface ChatResponse {
   agent_trajectory: string[];
   citations: DocumentCitation[];
   model_used?: string | null;
+  model_transition?: string | null;
+  pacing_notice?: string | null;
   model_error?: string | null;
 }
 

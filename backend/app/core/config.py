@@ -46,6 +46,14 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str = "gemini-flash-latest"
     GEMINI_EMBEDDING_MODEL: str = "models/gemini-embedding-001"
 
+    # OpenRouter Settings (Free Cloud LLMs: LLaMA 3.3, Gemini, DeepSeek R1, Qwen)
+    OPENROUTER_API_KEY: str = ""
+    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
+
+    # Groq Cloud Settings (Ultra-fast Free LLaMA 3.3)
+    GROQ_API_KEY: str = ""
+    GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
+
     # OpenAI Settings (Alternative)
     OPENAI_API_KEY: str = ""
     LLM_MODEL: str = "gpt-4o-mini"

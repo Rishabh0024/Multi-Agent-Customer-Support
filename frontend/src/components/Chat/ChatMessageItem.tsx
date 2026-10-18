@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bot, User, ThumbsUp, ThumbsDown, GitFork, BookOpen, Check, Cpu, AlertTriangle } from 'lucide-react';
+import { Bot, User, ThumbsUp, ThumbsDown, GitFork, BookOpen, Check, Cpu, AlertTriangle, RefreshCw, Clock } from 'lucide-react';
 import { ChatMessage, DocumentCitation } from '../../types';
 import { SentimentBadge } from './SentimentBadge';
 import { useSubmitFeedback } from '../../services/api';
@@ -44,7 +44,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({ message, sessi
             {/* Active Model Badge */}
             <span className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] sm:text-[11px] font-mono font-medium text-indigo-700 border border-indigo-200/80">
               <Cpu className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-indigo-600" />
-              {message.model_used || 'gemini-flash-latest'}
+              {message.model_used || 'gemini-3.5-flash'}
             </span>
 
             {message.sentiment && (
@@ -58,14 +58,35 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({ message, sessi
           </div>
         )}
 
-        {/* Model Error / Failover Alert Card */}
-        {isAssistant && message.model_error && (
-          <div className="mb-2 w-full rounded-xl border border-amber-200 bg-amber-50/90 p-2.5 text-xs text-amber-900 shadow-xs">
-            <div className="flex items-center gap-1.5 font-bold text-amber-950 text-[11px] sm:text-xs">
-              <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
-              <span>Model Failover / System Alert</span>
+        {/* Model Migration / Quota Transition Card (Point 1) */}
+        {isAssistant && message.model_transition && (
+          <div className="mb-2 w-full rounded-xl border border-sky-200 bg-sky-50/90 p-2.5 text-xs text-sky-950 shadow-2xs">
+            <div className="flex items-center gap-1.5 font-bold text-sky-900 text-[11px] sm:text-xs">
+              <RefreshCw className="h-3.5 w-3.5 text-sky-600 shrink-0" />
+              <span>Model Quota Auto-Switch</span>
             </div>
-            <p className="mt-1 text-[10px] sm:text-[11px] text-amber-800 font-mono leading-relaxed">
+            <p className="mt-1 text-[10px] sm:text-[11px] text-sky-800 font-mono leading-relaxed">
+              {message.model_transition}
+            </p>
+          </div>
+        )}
+
+        {/* Rate Limit Pacing Notice (Point 2) */}
+        {isAssistant && message.pacing_notice && (
+          <div className="mb-1.5 flex items-center gap-1.5 rounded-lg bg-indigo-50/70 border border-indigo-100 px-2.5 py-1 text-[10px] sm:text-[11px] text-indigo-800">
+            <Clock className="h-3 w-3 text-indigo-600 shrink-0" />
+            <span>{message.pacing_notice}</span>
+          </div>
+        )}
+
+        {/* Model Error / System Alert Card */}
+        {isAssistant && message.model_error && (
+          <div className="mb-2 w-full rounded-xl border border-rose-200 bg-rose-50/90 p-2.5 text-xs text-rose-900 shadow-xs">
+            <div className="flex items-center gap-1.5 font-bold text-rose-950 text-[11px] sm:text-xs">
+              <AlertTriangle className="h-3.5 w-3.5 text-rose-600 shrink-0" />
+              <span>System Error / All Models Cooldown</span>
+            </div>
+            <p className="mt-1 text-[10px] sm:text-[11px] text-rose-800 font-mono leading-relaxed">
               {message.model_error}
             </p>
           </div>

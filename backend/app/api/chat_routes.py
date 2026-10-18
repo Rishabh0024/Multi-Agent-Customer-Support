@@ -155,6 +155,8 @@ async def process_chat_message(
         agent_trajectory=trajectory,
         citations=citations,
         model_used=agent_output.get("model_used"),
+        model_transition=agent_output.get("model_transition"),
+        pacing_notice=agent_output.get("pacing_notice"),
         model_error=agent_output.get("model_error")
     )
 

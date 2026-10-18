@@ -19,5 +19,7 @@ class AgentState(TypedDict, total=False):
     confidence_score: float
     existing_ticket_number: Optional[str]
     model_used: Optional[str]
+    model_transition: Optional[str]
+    pacing_notice: Optional[str]
     model_error: Optional[str]
 

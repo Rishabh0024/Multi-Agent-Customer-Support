@@ -24,6 +24,8 @@ class ChatResponse(BaseModel):
     agent_trajectory: List[str]
     citations: List[DocumentCitation] = []
     model_used: Optional[str] = None
+    model_transition: Optional[str] = None
+    pacing_notice: Optional[str] = None
     model_error: Optional[str] = None
 
 

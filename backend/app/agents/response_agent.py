@@ -131,7 +131,9 @@ Refine the response:
             "final_response": final_response,
             "agent_trajectory": trajectory,
             "model_used": llm_helper.active_model_name,
-            "model_error": llm_helper.last_error or getattr(llm_helper, "last_notice", None)
+            "model_transition": llm_helper.last_transition,
+            "pacing_notice": llm_helper.last_pacing_notice,
+            "model_error": llm_helper.last_error
         }
 
 response_agent = ResponseAgent()

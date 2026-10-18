@@ -78,8 +78,9 @@ export const ChatWindow: React.FC = () => {
         sentiment_score: response.sentiment_score,
         intent: response.intent,
         agent_trajectory: response.agent_trajectory,
-        citations: response.citations,
         model_used: response.model_used,
+        model_transition: response.model_transition,
+        pacing_notice: response.pacing_notice,
         model_error: response.model_error,
         created_at: new Date().toISOString(),
       };
