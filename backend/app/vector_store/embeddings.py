@@ -40,11 +40,19 @@ class EmbeddingService:
             try:
                 import google.generativeai as genai
                 task_type = "retrieval_query" if is_query else "retrieval_document"
-                result = genai.embed_content(
-                    model=settings.GEMINI_EMBEDDING_MODEL,
-                    content=text,
-                    task_type=task_type
-                )
+                try:
+                    result = genai.embed_content(
+                        model=settings.GEMINI_EMBEDDING_MODEL,
+                        content=text,
+                        task_type=task_type,
+                        output_dimensionality=self.dimension
+                    )
+                except Exception:
+                    result = genai.embed_content(
+                        model=settings.GEMINI_EMBEDDING_MODEL,
+                        content=text,
+                        task_type=task_type
+                    )
                 embedding = result.get("embedding", [])
                 if embedding:
                     return embedding

@@ -44,19 +44,22 @@ Generate the polished final customer response:
                 {"role": "user", "content": prompt_content}
             ]
             res = await llm_helper.generate_chat_completion(messages)
-            if res:
+            if res and res.strip():
                 final_response = res.strip()
-        else:
-            # Deterministic formatting
+
+        # Deterministic fallback formatting if LLM was unavailable, failed, or rate-limited
+        if not final_response:
             prefix = ""
             if sentiment_label in ["angry", "frustrated"]:
                 prefix = "I truly understand your frustration and apologize for the inconvenience this has caused you. "
+            
+            body = raw_answer if raw_answer else "I have escalated this issue directly to our customer support leadership."
             
             suffix = ""
             if escalation_required and ticket_number:
                 suffix = f"\n\n---\n📋 **Support Ticket Created: #{ticket_number}**\nOur human support specialists have been notified with the highest priority and will review this conversation to assist you further."
 
-            final_response = f"{prefix}{raw_answer}{suffix}".strip()
+            final_response = f"{prefix}{body}{suffix}".strip()
 
         logger.info(f"[ResponseAgent] Final response generated. Trajectory: {' -> '.join(trajectory)}")
         return {
