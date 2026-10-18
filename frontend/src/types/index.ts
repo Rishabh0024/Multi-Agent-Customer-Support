@@ -68,3 +68,11 @@ export interface KnowledgeDoc {
   content: string;
   metadata?: Record<string, any>;
 }
+
+export interface ModelOption {
+  id: string;
+  name: string;
+  provider: string;
+  status: string;
+  is_current: boolean;
+}

@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ChatResponse, Ticket, TicketStats, KnowledgeDoc } from '../types';
+import { ChatResponse, Ticket, TicketStats, KnowledgeDoc, ModelOption } from '../types';
 
 let rawApiUrl = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/+$/, '');
 if (rawApiUrl.endsWith('/api')) {
@@ -18,6 +18,7 @@ export const apiClient = axios.create({
 // Keys
 export const queryKeys = {
   chatHistory: (sessionId: string) => ['chat', 'history', sessionId],
+  models: ['chat', 'models'],
   tickets: (status?: string, priority?: string) => ['tickets', { status, priority }],
   ticketStats: ['tickets', 'stats'],
   ticketDetail: (id: string) => ['tickets', 'detail', id],
@@ -37,6 +38,30 @@ export const useChatHistory = (sessionId: string) => {
   });
 };
 
+export const useAvailableModels = () => {
+  return useQuery({
+    queryKey: queryKeys.models,
+    queryFn: async (): Promise<ModelOption[]> => {
+      const { data } = await apiClient.get('/api/chat/models');
+      return data;
+    },
+    refetchInterval: 15000,
+  });
+};
+
+export const useSelectModel = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (modelId: string) => {
+      const { data } = await apiClient.post('/api/chat/model/select', { model_id: modelId });
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.models });
+    },
+  });
+};
+
 export const useSendMessage = () => {
   return useMutation({
     mutationFn: async (payload: {
@@ -44,6 +69,7 @@ export const useSendMessage = () => {
       message: string;
       user_name?: string;
       user_email?: string;
+      preferred_model?: string;
     }): Promise<ChatResponse> => {
       const { data } = await apiClient.post('/api/chat', payload);
       return data;

@@ -32,7 +32,13 @@ class ModelCandidate:
         """Places model on cooldown upon error or quota exhaustion."""
         self.consecutive_errors += 1
         self.last_error = error_str
-        cooldown_sec = 180.0 if is_quota else 60.0
+        err_lower = error_str.lower()
+        if any(w in err_lower for w in ["perday", "day", "daily", "retry_delay", "limit: 20"]):
+            cooldown_sec = 21600.0  # 6 hours cooldown for daily quota limits
+        elif is_quota:
+            cooldown_sec = 600.0    # 10 minutes for rate limit quotas
+        else:
+            cooldown_sec = 90.0     # 90 seconds for temporary errors
         self.cooldown_until = time.time() + cooldown_sec
         logger.warning(
             f"Model '{self.display_name}' placed on cooldown for {cooldown_sec}s "
@@ -54,11 +60,13 @@ class LLMQueueManager:
     2. Quota pacing: sleeps to satisfy per-model request intervals (RPM/RPS).
     3. Multi-cloud failover: auto-switches models on 429 quota exhaustion.
     4. Model transparency: returns exact migration and pacing metadata for UI display.
+    5. Persistent active model preference: locks into working model and allows manual switching.
     """
 
     def __init__(self):
         self.pool: List[ModelCandidate] = []
         self._lock = asyncio.Lock()
+        self.preferred_model_id: Optional[str] = None
         self.active_model_name: Optional[str] = None
         self.last_transition: Optional[str] = None
         self.last_pacing_notice: Optional[str] = None
@@ -71,14 +79,14 @@ class LLMQueueManager:
 
         # 1. Google Gemini Free Models (using user's active API key)
         if settings.GEMINI_API_KEY and settings.GEMINI_API_KEY != "your-gemini-api-key-here":
-            # Models verified active on Google AI Studio
+            # Models verified active on Google AI Studio (tested live)
             gemini_candidates = [
-                ("models/gemini-3.5-flash", "Gemini 3.5 Flash (Google AI)", 3.0),
-                ("models/gemini-3.5-flash-lite", "Gemini 3.5 Flash Lite (Google AI)", 2.5),
-                ("models/gemini-flash-lite-latest", "Gemini Flash Lite Latest (Google AI)", 2.5),
+                ("models/gemini-flash-lite-latest", "Gemini Flash Lite (Google AI)", 2.0),
+                ("models/gemini-3.1-flash-lite-preview", "Gemini 3.1 Flash Lite Preview (Google AI)", 2.0),
+                ("models/gemini-3-flash-preview", "Gemini 3 Flash Preview (Google AI)", 2.5),
                 ("models/gemma-4-26b-a4b-it", "Gemma 4 26B Instruct (Google AI)", 3.0),
-                ("models/gemini-flash-latest", "Gemini Flash Latest (Google AI)", 3.0),
                 ("models/gemini-3.8-flash", "Gemini 3.8 Flash (Google AI)", 3.0),
+                ("models/gemini-flash-latest", "Gemini Flash Latest (Google AI)", 3.0),
             ]
             for model_id, display, interval in gemini_candidates:
                 self.pool.append(ModelCandidate("gemini", model_id, display, interval))
@@ -136,8 +144,20 @@ class LLMQueueManager:
             transition_notice: Optional[str] = None
             pacing_notice: Optional[str] = None
 
+            # Prioritize preferred_model_id first, then other pool candidates
+            ordered_candidates: List[ModelCandidate] = []
+            if self.preferred_model_id:
+                for c in self.pool:
+                    if c.model_id == self.preferred_model_id:
+                        ordered_candidates.append(c)
+                        break
+
+            for c in self.pool:
+                if c not in ordered_candidates:
+                    ordered_candidates.append(c)
+
             # Attempt through available models in priority order
-            for candidate in self.pool:
+            for candidate in ordered_candidates:
                 if not candidate.is_available():
                     continue
 
@@ -162,6 +182,8 @@ class LLMQueueManager:
                     if result and result.strip():
                         candidate.mark_success()
                         self.active_model_name = candidate.display_name
+                        # LOCK IN this working model as preferred for subsequent questions!
+                        self.preferred_model_id = candidate.model_id
 
                         if failed_in_this_turn:
                             transition_notice = (
@@ -179,6 +201,9 @@ class LLMQueueManager:
                     is_quota = any(q in err_msg.lower() for q in ["429", "quota", "rate limit", "exceeded your current quota", "resource_exhausted"])
                     candidate.mark_failure(err_msg, is_quota=is_quota)
                     failed_in_this_turn.append(candidate.display_name)
+                    # If this failing model was our preferred model, clear it so we advance forward!
+                    if self.preferred_model_id == candidate.model_id:
+                        self.preferred_model_id = None
                     logger.warning(
                         f"Model {candidate.display_name} failed ({err_msg[:60]}). "
                         f"Auto-switching to next candidate in queue..."
@@ -188,6 +213,40 @@ class LLMQueueManager:
             # If all models failed or on cooldown
             self.last_error = f"All {len(self.pool)} candidate models failed or on quota cooldown: {', '.join(failed_in_this_turn)}"
             return None, None, None, None
+
+    def set_preferred_model(self, model_id: str) -> bool:
+        """Manually switches the active model in the pool."""
+        for m in self.pool:
+            if m.model_id == model_id:
+                self.preferred_model_id = model_id
+                self.active_model_name = m.display_name
+                m.cooldown_until = 0.0  # Clear cooldown on explicit manual selection
+                logger.info(f"User manually switched active model to: {m.display_name}")
+                return True
+        return False
+
+    def get_models_status(self) -> List[Dict[str, Any]]:
+        """Returns live status of all pool models for UI display & switcher."""
+        now = time.time()
+        result = []
+        for m in self.pool:
+            is_current = (m.model_id == self.preferred_model_id) or (not self.preferred_model_id and m == self.pool[0])
+            if now < m.cooldown_until:
+                remaining_sec = int(m.cooldown_until - now)
+                status = f"cooldown ({remaining_sec}s)"
+            elif is_current:
+                status = "active"
+            else:
+                status = "available"
+
+            result.append({
+                "id": m.model_id,
+                "name": m.display_name,
+                "provider": m.provider,
+                "status": status,
+                "is_current": is_current
+            })
+        return result
 
     async def _call_provider(
         self,

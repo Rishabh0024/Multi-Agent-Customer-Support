@@ -1,3 +1,4 @@
+from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -5,9 +6,13 @@ from datetime import datetime
 
 from app.db.database import get_db_session
 from app.db.models import ChatSession, ChatMessage, Ticket, Feedback, User
-from app.schemas.chat import ChatRequest, ChatResponse, DocumentCitation, FeedbackRequest, MessageHistoryItem
+from app.schemas.chat import (
+    ChatRequest, ChatResponse, DocumentCitation, FeedbackRequest,
+    MessageHistoryItem, ModelOption, SelectModelRequest
+)
 from app.memory.session_memory import session_memory
 from app.agents.graph import agent_graph
+from app.agents.llm_pool import llm_queue_manager
 from app.core.logging import logger
 
 router = APIRouter(prefix="/api/chat", tags=["Chat"])
@@ -20,6 +25,10 @@ async def process_chat_message(
     """Processes user chat messages through the multi-agent orchestration graph."""
     session_id = payload.session_id.strip()
     user_message = payload.message.strip()
+
+    # If user explicitly preferred a model in the request, set it
+    if payload.preferred_model:
+        llm_queue_manager.set_preferred_model(payload.preferred_model)
 
     # 1. Retrieve or create session in PostgreSQL
     stmt = select(ChatSession).where(ChatSession.session_id == session_id)
@@ -203,3 +212,24 @@ async def submit_feedback(
     db.add(feedback)
     await db.commit()
     return {"status": "success", "message": "Feedback recorded successfully"}
+
+@router.get("/models", response_model=List[ModelOption])
+async def get_available_models():
+    """Returns the live status of all candidate models in the pool."""
+    return llm_queue_manager.get_models_status()
+
+@router.post("/model/select")
+async def select_active_model(payload: SelectModelRequest):
+    """Manually switches the active LLM candidate in the pool."""
+    success = llm_queue_manager.set_preferred_model(payload.model_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Model ID '{payload.model_id}' was not found in the candidate pool."
+        )
+    return {
+        "status": "success",
+        "model_id": payload.model_id,
+        "display_name": llm_queue_manager.active_model_name,
+        "message": f"Successfully switched active model to {llm_queue_manager.active_model_name}"
+    }

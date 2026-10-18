@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { RotateCcw, LifeBuoy, AlertCircle, Clock } from 'lucide-react';
+import { RotateCcw, LifeBuoy, AlertCircle, Clock, Cpu, ChevronDown, Check, RefreshCw } from 'lucide-react';
 import { ChatMessage, ChatResponse } from '../../types';
 import { ChatMessageItem } from './ChatMessageItem';
 import { ChatInput } from './ChatInput';
-import { useSendMessage, useChatHistory } from '../../services/api';
+import { useSendMessage, useChatHistory, useAvailableModels, useSelectModel } from '../../services/api';
 
 const generateSessionId = () => `sess_${Math.random().toString(36).substring(2, 10)}`;
 
@@ -14,10 +14,29 @@ export const ChatWindow: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [escalatedTicket, setEscalatedTicket] = useState<string | null>(null);
   const [loadingSeconds, setLoadingSeconds] = useState(0);
+  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
   const sendMessageMutation = useSendMessage();
   const { data: historyData } = useChatHistory(sessionId);
+  const { data: modelsData, refetch: refetchModels } = useAvailableModels();
+  const selectModelMutation = useSelectModel();
+
+  // Active model
+  const currentModel = modelsData?.find((m) => m.is_current) || modelsData?.[0];
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsModelDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Track pending duration for queue & rate pacing transparency
   useEffect(() => {
@@ -83,6 +102,7 @@ export const ChatWindow: React.FC = () => {
       const response: ChatResponse = await sendMessageMutation.mutateAsync({
         session_id: sessionId,
         message: text,
+        preferred_model: currentModel?.id,
       });
 
       const assistantMsg: ChatMessage = {
@@ -102,6 +122,10 @@ export const ChatWindow: React.FC = () => {
 
       setMessages((prev) => [...prev, assistantMsg]);
 
+      if (response.model_transition) {
+        refetchModels();
+      }
+
       if (response.escalation_required && response.ticket_number) {
         setEscalatedTicket(response.ticket_number);
       }
@@ -115,6 +139,16 @@ export const ChatWindow: React.FC = () => {
         created_at: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, errorMsg]);
+    }
+  };
+
+  const handleSelectModel = async (modelId: string) => {
+    try {
+      await selectModelMutation.mutateAsync(modelId);
+      await refetchModels();
+      setIsModelDropdownOpen(false);
+    } catch (err) {
+      console.error('Failed to switch model:', err);
     }
   };
 
@@ -139,7 +173,7 @@ export const ChatWindow: React.FC = () => {
   return (
     <div className="flex h-[calc(100dvh-112px)] md:h-[calc(100vh-80px)] max-w-5xl mx-auto flex-col rounded-none md:rounded-2xl border-0 md:border border-slate-200 bg-white shadow-none md:shadow-xl overflow-hidden my-0 md:my-4">
       {/* Chat Header */}
-      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/80 px-3.5 py-2.5 sm:px-5 sm:py-3 backdrop-blur-sm">
+      <div className="flex flex-wrap items-center justify-between border-b border-slate-200 bg-slate-50/80 px-3.5 py-2.5 sm:px-5 sm:py-3 backdrop-blur-sm gap-2 relative z-20">
         <div className="flex items-center gap-2.5">
           <div className="flex h-2.5 w-2.5 relative">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -158,14 +192,111 @@ export const ChatWindow: React.FC = () => {
           </div>
         </div>
 
-        <button
-          onClick={handleNewChat}
-          title="Start fresh conversation"
-          className="flex items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 px-2.5 py-1.5 sm:px-3 text-xs font-semibold text-sky-700 shadow-xs hover:bg-sky-100 transition-all active:scale-95"
-        >
-          <RotateCcw className="h-3.5 w-3.5 text-sky-600" />
-          <span>New Chat</span>
-        </button>
+        {/* Right Header Controls: Model Switcher & New Chat */}
+        <div className="flex items-center gap-2">
+          {/* Model Switcher Dropdown */}
+          <div className="relative" ref={dropdownRef}>
+            <button
+              type="button"
+              onClick={() => setIsModelDropdownOpen((prev) => !prev)}
+              title="Click to manually switch AI model or view quota status"
+              className="flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50/90 px-2 py-1.5 sm:px-3 text-xs font-semibold text-indigo-700 shadow-xs hover:bg-indigo-100 transition-all active:scale-95"
+            >
+              <Cpu className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+              <span className="max-w-[100px] sm:max-w-[160px] truncate text-[11px] sm:text-xs font-mono">
+                {currentModel?.name?.replace(/ \(.*\)/, '') || 'Model Switcher'}
+              </span>
+              <ChevronDown className={`h-3 w-3 text-indigo-500 transition-transform ${isModelDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Dropdown Menu */}
+            {isModelDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-72 sm:w-84 rounded-2xl border border-slate-200 bg-white p-2.5 shadow-xl shadow-slate-900/10 z-50 animate-fadeIn">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100 px-1">
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-800">Select Active LLM</h3>
+                    <p className="text-[10px] text-slate-500">Auto-failover enabled if quota exhausts</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => refetchModels()}
+                    title="Refresh model quota statuses"
+                    className="p-1 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-100 transition-colors"
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                  </button>
+                </div>
+
+                <div className="mt-2 max-h-60 overflow-y-auto space-y-1 pr-0.5">
+                  {modelsData && modelsData.length > 0 ? (
+                    modelsData.map((m) => {
+                      const isCooldown = m.status.startsWith('cooldown');
+                      const isActive = m.is_current;
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => handleSelectModel(m.id)}
+                          disabled={selectModelMutation.isPending}
+                          className={`w-full text-left rounded-xl p-2 transition-all flex items-center justify-between text-xs ${
+                            isActive
+                              ? 'bg-indigo-50 border border-indigo-200 text-indigo-900 font-semibold'
+                              : isCooldown
+                              ? 'bg-amber-50/50 hover:bg-amber-50 text-slate-600 border border-amber-200/50'
+                              : 'hover:bg-slate-50 text-slate-700 border border-transparent'
+                          }`}
+                        >
+                          <div className="flex flex-col min-w-0 pr-2">
+                            <span className="truncate text-[11px] sm:text-xs font-medium text-slate-800">
+                              {m.name}
+                            </span>
+                            <span className="text-[9px] uppercase font-mono tracking-wider text-slate-400">
+                              {m.provider}
+                            </span>
+                          </div>
+
+                          <div className="shrink-0 flex items-center gap-1">
+                            {isActive && (
+                              <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-semibold px-2 py-0.5">
+                                <Check className="h-2.5 w-2.5" />
+                                Active
+                              </span>
+                            )}
+                            {isCooldown && !isActive && (
+                              <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 text-amber-800 text-[9px] font-mono px-1.5 py-0.5">
+                                <Clock className="h-2.5 w-2.5" />
+                                {m.status}
+                              </span>
+                            )}
+                            {!isActive && !isCooldown && (
+                              <span className="inline-flex rounded-full bg-slate-100 text-slate-600 text-[9px] px-1.5 py-0.5">
+                                Ready
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <div className="p-3 text-center text-xs text-slate-400">
+                      Loading candidate models...
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* New Chat Button */}
+          <button
+            onClick={handleNewChat}
+            title="Start fresh conversation"
+            className="flex items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 px-2.5 py-1.5 sm:px-3 text-xs font-semibold text-sky-700 shadow-xs hover:bg-sky-100 transition-all active:scale-95 shrink-0"
+          >
+            <RotateCcw className="h-3.5 w-3.5 text-sky-600" />
+            <span className="hidden sm:inline">New Chat</span>
+          </button>
+        </div>
       </div>
 
       {/* Escalation Notification Bar */}

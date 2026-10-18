@@ -6,6 +6,17 @@ class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=4000, description="Customer message")
     user_name: Optional[str] = Field(None, description="Optional customer name")
     user_email: Optional[str] = Field(None, description="Optional customer email")
+    preferred_model: Optional[str] = Field(None, description="Optional user-selected model ID to use for inference")
+
+class ModelOption(BaseModel):
+    id: str
+    name: str
+    provider: str
+    status: str
+    is_current: bool
+
+class SelectModelRequest(BaseModel):
+    model_id: str
 
 class DocumentCitation(BaseModel):
     title: str
