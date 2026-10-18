@@ -248,7 +248,11 @@ class LLMQueueManager:
             openrouter_key = (getattr(settings, "OPENROUTER_API_KEY", "") or os.environ.get("OPENROUTER_API_KEY", "")).strip()
             client = AsyncOpenAI(
                 base_url=settings.OPENROUTER_BASE_URL,
-                api_key=openrouter_key
+                api_key=openrouter_key,
+                default_headers={
+                    "HTTP-Referer": "https://multi-agent-customer-support-three.vercel.app",
+                    "X-Title": "Multi-Agent Customer Support Assistant"
+                }
             )
             kwargs = {
                 "model": candidate.model_id,

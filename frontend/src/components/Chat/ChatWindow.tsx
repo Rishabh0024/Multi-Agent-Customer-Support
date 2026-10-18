@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { RotateCcw, LifeBuoy, AlertCircle } from 'lucide-react';
+import { RotateCcw, LifeBuoy, AlertCircle, Clock } from 'lucide-react';
 import { ChatMessage, ChatResponse } from '../../types';
 import { ChatMessageItem } from './ChatMessageItem';
 import { ChatInput } from './ChatInput';
@@ -13,10 +13,25 @@ export const ChatWindow: React.FC = () => {
   });
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [escalatedTicket, setEscalatedTicket] = useState<string | null>(null);
+  const [loadingSeconds, setLoadingSeconds] = useState(0);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const sendMessageMutation = useSendMessage();
   const { data: historyData } = useChatHistory(sessionId);
+
+  // Track pending duration for queue & rate pacing transparency
+  useEffect(() => {
+    let interval: any;
+    if (sendMessageMutation.isPending) {
+      setLoadingSeconds(0);
+      interval = setInterval(() => {
+        setLoadingSeconds((prev) => prev + 1);
+      }, 1000);
+    } else {
+      setLoadingSeconds(0);
+    }
+    return () => clearInterval(interval);
+  }, [sendMessageMutation.isPending]);
 
   // Sync session in localStorage
   useEffect(() => {
@@ -177,21 +192,31 @@ export const ChatWindow: React.FC = () => {
           <ChatMessageItem key={msg.id} message={msg} sessionId={sessionId} />
         ))}
 
-        {/* Loading Indicator */}
+        {/* Loading Indicator with Queue & Rate Pacing Transparency */}
         {sendMessageMutation.isPending && (
-          <div className="flex w-full gap-2.5 py-2 justify-start items-center">
-            <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-sky-600 to-indigo-600 text-white shadow-sm animate-pulse">
-              <LifeBuoy className="h-4 w-4 sm:h-5 sm:w-5" />
+          <div className="flex w-full gap-2.5 py-2 justify-start items-start animate-fadeIn">
+            <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-sky-600 to-indigo-600 text-white shadow-sm mt-0.5">
+              <LifeBuoy className="h-4 w-4 sm:h-5 sm:w-5 animate-spin-slow" />
             </div>
-            <div className="rounded-2xl rounded-tl-sm bg-white border border-slate-200 px-3.5 py-2.5 text-xs text-slate-500 shadow-xs flex items-center gap-2.5">
-              <span className="flex space-x-1">
-                <span className="h-2 w-2 bg-sky-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                <span className="h-2 w-2 bg-sky-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                <span className="h-2 w-2 bg-sky-500 rounded-full animate-bounce"></span>
-              </span>
-              <span className="text-[11px] sm:text-xs font-medium text-slate-500 font-mono">
-                Multi-agents coordinating (LangGraph RAG)...
-              </span>
+            <div className="rounded-2xl rounded-tl-sm bg-white border border-slate-200 px-3.5 py-2.5 text-xs text-slate-600 shadow-xs flex flex-col gap-1.5 max-w-[85%] sm:max-w-[70%]">
+              <div className="flex items-center gap-2">
+                <span className="flex space-x-1 shrink-0">
+                  <span className="h-2 w-2 bg-sky-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                  <span className="h-2 w-2 bg-sky-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                  <span className="h-2 w-2 bg-sky-500 rounded-full animate-bounce"></span>
+                </span>
+                <span className="text-[11px] sm:text-xs font-semibold text-slate-700">
+                  {loadingSeconds < 3
+                    ? 'Multi-agents coordinating (LangGraph RAG)...'
+                    : 'Queue & rate-pacing active (Please be patient...)'}
+                </span>
+              </div>
+              {loadingSeconds >= 2 && (
+                <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-amber-800 bg-amber-50 rounded-lg px-2 py-1 border border-amber-200/80 font-mono">
+                  <Clock className="h-3 w-3 text-amber-600 shrink-0" />
+                  <span>Protecting model quota: request paced in FIFO queue ({loadingSeconds}s)...</span>
+                </div>
+              )}
             </div>
           </div>
         )}
