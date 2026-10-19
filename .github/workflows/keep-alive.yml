@@ -2,9 +2,11 @@ name: Render Backend Anti-Sleep Keep-Alive
 
 on:
   schedule:
-    # Run every 5 minutes (the shortest interval allowed by GitHub Actions scheduler)
+    # Run every 5 minutes (shortest supported GitHub Actions interval)
     - cron: '*/5 * * * *'
   workflow_dispatch: # Allows manual on-demand trigger from GitHub Actions tab
+  repository_dispatch: # Allows external triggers (e.g. from cron-job.org or webhook)
+    types: [keepalive-ping]
 
 jobs:
   ping-keepalive:
@@ -18,9 +20,9 @@ jobs:
           TARGET_HOST="${BACKEND_URL:-https://multi-agent-customer-support-api-cg0x.onrender.com}"
           echo "Base Host: ${TARGET_HOST}"
 
-          # Minimal anti-bot jitter (0 to 10 seconds)
-          SLEEP_SECONDS=$(( RANDOM % 10 ))
-          echo "Applying dynamic jitter: sleeping for ${SLEEP_SECONDS}s..."
+          # Randomized jitter between 60 and 180 seconds (1 to 3 minutes random window)
+          SLEEP_SECONDS=$(( 60 + RANDOM % 121 ))
+          echo "Applying dynamic jitter: sleeping for ${SLEEP_SECONDS}s (1 to 3 minutes randomized delay)..."
           sleep "$SLEEP_SECONDS"
 
           # Endpoint rotation across 4 routes: /api/ping, /api/health, /api/chat/models, /
