@@ -47,8 +47,8 @@ jobs:
           echo "🏷️ Source Header: X-Keepalive-Source: GitHub-Actions-AntiSleep"
           echo "=============================================="
 
-          # Ping request with custom keep-alive identifier header
-          HTTP_BODY=$(curl -s \
+          # Single ping request extracting both body and status code (strictly 1 HTTP request)
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
             -H "X-Keepalive-Source: GitHub-Actions-AntiSleep" \
             -H "User-Agent: ${SELECTED_UA}" \
             -H "Accept: application/json, text/plain, */*" \
@@ -56,16 +56,10 @@ jobs:
             -H "Sec-Fetch-Mode: cors" \
             -H "Sec-Ch-Ua-Mobile: ?0" \
             --max-time 25 \
-            --retry 2 \
-            --retry-delay 3 \
             "$TARGET_URL" || true)
 
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "X-Keepalive-Source: GitHub-Actions-AntiSleep" \
-            -H "User-Agent: ${SELECTED_UA}" \
-            -H "Accept: application/json, text/plain, */*" \
-            --max-time 15 \
-            "$TARGET_URL" || true)
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          HTTP_BODY=$(echo "$RESPONSE" | sed '$d')
 
           echo "📥 Response Body: ${HTTP_BODY}"
           echo "📊 Response HTTP Status: ${HTTP_CODE}"
