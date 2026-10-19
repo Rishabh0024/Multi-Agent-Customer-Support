@@ -182,5 +182,7 @@ export const useSystemHealth = () => {
       const { data } = await apiClient.get('/api/health');
       return data;
     },
+    staleTime: 10 * 60 * 1000, // 10 minutes cache to avoid excessive network overhead
+    refetchOnWindowFocus: false, // Avoid refetching every time user focuses tab
   });
 };
