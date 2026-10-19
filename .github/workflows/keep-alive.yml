@@ -3,7 +3,7 @@ name: Render Backend Anti-Sleep Keep-Alive
 on:
   schedule:
     # Run every 11 minutes (combined with 0-180s jitter, yields 11 to 14 minutes interval)
-    - cron: '*/1 * * * *'
+    - cron: '*/11 * * * *'
   workflow_dispatch: # Allows manual on-demand trigger from GitHub Actions tab
 
 jobs:
