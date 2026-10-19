@@ -15,14 +15,6 @@ from app.api.ticket_routes import router as ticket_router
 from app.api.knowledge_routes import router as knowledge_router
 from app.api.health_routes import router as health_router
 
-class PingLogFilter(logging.Filter):
-    """Filters out ping access logs so container probes never pollute stdout."""
-    def filter(self, record: logging.LogRecord) -> bool:
-        msg = record.getMessage()
-        return "/api/ping" not in msg and "/ping" not in msg
-
-logging.getLogger("uvicorn.access").addFilter(PingLogFilter())
-
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Middleware enforcing secure reverse proxy and browser protection headers."""
     async def dispatch(self, request: Request, call_next):
@@ -76,7 +68,11 @@ app.include_router(health_router)
 
 @app.get("/api/ping", tags=["Health & Status"])
 @app.head("/api/ping", tags=["Health & Status"])
-async def ping_alias():
+async def ping_alias(request: Request):
+    client_ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "unknown")
+    user_agent = request.headers.get("user-agent", "unknown")
+    ip_clean = client_ip.split(",")[0].strip()
+    logger.info(f"🟢 [Keep-Alive Ping] Keepalive ping received from {ip_clean} | UA: {user_agent[:45]}")
     return {"status": "awake", "service": "customer-support-api"}
 
 @app.get("/", tags=["Root"])

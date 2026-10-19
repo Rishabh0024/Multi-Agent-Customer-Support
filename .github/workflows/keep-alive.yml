@@ -24,12 +24,10 @@ jobs:
           echo "Applying dynamic jitter: sleeping for ${SLEEP_SECONDS}s to randomize request signature..."
           sleep "$SLEEP_SECONDS"
 
-          # Endpoint rotation across non-destructive endpoints (excluding /api/ping)
-          ENDPOINTS=("/api/chat/models" "/api/health" "/")
+          # Endpoint rotation across healthy non-destructive endpoints (including /api/ping)
+          ENDPOINTS=("/api/ping" "/api/chat/models" "/api/health" "/")
           SELECTED_ENDPOINT="${ENDPOINTS[$(( RANDOM % ${#ENDPOINTS[@]} ))]}"
           TARGET_URL="${TARGET_HOST%/}${SELECTED_ENDPOINT}"
-          echo "Selected Endpoint: ${SELECTED_ENDPOINT}"
-          echo "Pinging Target: ${TARGET_URL}"
 
           # Rotating User-Agents (Windows/Mac, Chrome/Firefox/Safari)
           USER_AGENTS=(
@@ -40,7 +38,15 @@ jobs:
           )
           SELECTED_UA="${USER_AGENTS[$(( RANDOM % ${#USER_AGENTS[@]} ))]}"
 
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+          echo "=============================================="
+          echo "⏰ Keep-Alive Ping Execution Started"
+          echo "📅 UTC Timestamp: $(date -u)"
+          echo "🎯 Target URL: ${TARGET_URL}"
+          echo "🌐 Client User-Agent: ${SELECTED_UA}"
+          echo "=============================================="
+
+          # Ping request with output capture
+          HTTP_BODY=$(curl -s \
             -H "User-Agent: ${SELECTED_UA}" \
             -H "Accept: application/json, text/plain, */*" \
             -H "Accept-Language: en-US,en;q=0.9" \
@@ -51,10 +57,19 @@ jobs:
             --retry-delay 3 \
             "$TARGET_URL" || true)
 
-          echo "Response HTTP Status: ${HTTP_CODE}"
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "User-Agent: ${SELECTED_UA}" \
+            -H "Accept: application/json, text/plain, */*" \
+            --max-time 15 \
+            "$TARGET_URL" || true)
+
+          echo "📥 Response Body: ${HTTP_BODY}"
+          echo "📊 Response HTTP Status: ${HTTP_CODE}"
 
           if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 400 ]; then
-            echo "Success: Backend is active and responded with HTTP ${HTTP_CODE}. Render sleep averted!"
+            echo "✅ SUCCESS: Backend is awake and responsive (HTTP ${HTTP_CODE})!"
+            echo "💤 Render 15-minute inactivity spin-down successfully prevented."
           else
-            echo "Notice: Backend responded with HTTP ${HTTP_CODE} (Instance might be spinning up or warming caches)."
+            echo "⚠️ WARNING: Backend returned HTTP ${HTTP_CODE}. Service might be cold starting."
           fi
+          echo "=============================================="
