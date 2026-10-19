@@ -35,6 +35,8 @@ export const useChatHistory = (sessionId: string) => {
       return data;
     },
     enabled: Boolean(sessionId),
+    staleTime: 5 * 60 * 1000, // 5 minutes cache to prevent re-querying on focus/switch
+    refetchOnWindowFocus: false,
   });
 };
 
@@ -45,7 +47,8 @@ export const useAvailableModels = () => {
       const { data } = await apiClient.get('/api/chat/models');
       return data;
     },
-    refetchInterval: 15000,
+    staleTime: 10 * 60 * 1000, // 10 minutes cache
+    refetchOnWindowFocus: false, // Prevent spam on tab focus
   });
 };
 

@@ -6,6 +6,7 @@ from app.memory.redis_client import redis_manager
 router = APIRouter(prefix="/api/health", tags=["Health & Status"])
 
 @router.get("")
+@router.head("")
 async def check_health():
     """Health check for system components."""
     qdrant_healthy = False

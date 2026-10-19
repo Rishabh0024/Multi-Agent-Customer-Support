@@ -76,6 +76,7 @@ async def ping_alias(request: Request):
     return {"status": "awake", "service": "customer-support-api"}
 
 @app.get("/", tags=["Root"])
+@app.head("/", tags=["Root"])
 async def root(request: Request):
     client_ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "unknown")
     return {
