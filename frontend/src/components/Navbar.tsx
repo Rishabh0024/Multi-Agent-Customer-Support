@@ -1,11 +1,8 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { MessageSquare, LifeBuoy, BookOpen, Activity, ShieldCheck } from 'lucide-react';
-import { useSystemHealth } from '../services/api';
 
 export const Navbar: React.FC = () => {
-  const { data: health } = useSystemHealth();
-
   return (
     <>
       {/* Top Navbar Header */}
@@ -79,9 +76,7 @@ export const Navbar: React.FC = () => {
             </span>
             <span className="text-[11px] sm:text-xs font-medium text-slate-600 flex items-center gap-1">
               <Activity className="h-3 w-3 text-emerald-600" />
-              <span className="hidden sm:inline">
-                {health?.components?.qdrant_vector_store === 'operational' ? 'Qdrant & NeonDB Connected' : 'System Active'}
-              </span>
+              <span className="hidden sm:inline">System Active</span>
               <span className="sm:hidden font-semibold text-emerald-700">Live</span>
             </span>
           </div>

@@ -105,7 +105,8 @@ export const useTickets = (status?: string, priority?: string) => {
       const { data } = await apiClient.get('/api/tickets', { params });
       return data;
     },
-    refetchInterval: 10000, // Poll every 10s for new escalated tickets
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 };
 
@@ -116,7 +117,8 @@ export const useTicketStats = () => {
       const { data } = await apiClient.get('/api/tickets/stats');
       return data;
     },
-    refetchInterval: 10000,
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 };
 
