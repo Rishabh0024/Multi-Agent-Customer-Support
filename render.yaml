@@ -6,7 +6,6 @@ services:
     dockerContext: backend
     plan: free
     region: oregon
-    healthCheckPath: /api/ping
     envVars:
       - key: APP_ENV
         value: production

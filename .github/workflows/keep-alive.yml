@@ -24,8 +24,8 @@ jobs:
           echo "Applying dynamic jitter: sleeping for ${SLEEP_SECONDS}s to randomize request signature..."
           sleep "$SLEEP_SECONDS"
 
-          # Endpoint rotation across 4 non-destructive endpoints
-          ENDPOINTS=("/api/ping" "/api/chat/models" "/api/health" "/")
+          # Endpoint rotation across non-destructive endpoints (excluding /api/ping)
+          ENDPOINTS=("/api/chat/models" "/api/health" "/")
           SELECTED_ENDPOINT="${ENDPOINTS[$(( RANDOM % ${#ENDPOINTS[@]} ))]}"
           TARGET_URL="${TARGET_HOST%/}${SELECTED_ENDPOINT}"
           echo "Selected Endpoint: ${SELECTED_ENDPOINT}"

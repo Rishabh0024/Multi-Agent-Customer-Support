@@ -1,4 +1,5 @@
 import os
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,6 +14,14 @@ from app.api.chat_routes import router as chat_router
 from app.api.ticket_routes import router as ticket_router
 from app.api.knowledge_routes import router as knowledge_router
 from app.api.health_routes import router as health_router
+
+class PingLogFilter(logging.Filter):
+    """Filters out ping access logs so container probes never pollute stdout."""
+    def filter(self, record: logging.LogRecord) -> bool:
+        msg = record.getMessage()
+        return "/api/ping" not in msg and "/ping" not in msg
+
+logging.getLogger("uvicorn.access").addFilter(PingLogFilter())
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Middleware enforcing secure reverse proxy and browser protection headers."""
