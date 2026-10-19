@@ -5,8 +5,8 @@ on:
     # Run every 5 minutes (shortest supported GitHub Actions interval)
     - cron: '*/5 * * * *'
   workflow_dispatch: # Allows manual on-demand trigger from GitHub Actions tab
-  repository_dispatch: # Allows external triggers (e.g. from cron-job.org or webhook)
-    types: [keepalive-ping]
+  repository_dispatch: # Allows external triggers (e.g. from cron-job.org webhook)
+    types: [keepalive-ping, ping, keepalive]
 
 jobs:
   ping-keepalive:
@@ -20,9 +20,9 @@ jobs:
           TARGET_HOST="${BACKEND_URL:-https://multi-agent-customer-support-api-cg0x.onrender.com}"
           echo "Base Host: ${TARGET_HOST}"
 
-          # Randomized jitter between 60 and 180 seconds (1 to 3 minutes random window)
-          SLEEP_SECONDS=$(( 60 + RANDOM % 121 ))
-          echo "Applying dynamic jitter: sleeping for ${SLEEP_SECONDS}s (1 to 3 minutes randomized delay)..."
+          # Randomized jitter between 60 and 240 seconds (1 to 4 minutes random window)
+          SLEEP_SECONDS=$(( 60 + RANDOM % 181 ))
+          echo "Applying dynamic jitter: sleeping for ${SLEEP_SECONDS}s (1 to 4 minutes randomized delay)..."
           sleep "$SLEEP_SECONDS"
 
           # Endpoint rotation across 4 routes: /api/ping, /api/health, /api/chat/models, /
