@@ -14,8 +14,10 @@
 
 An enterprise-grade, placement-ready **Multi-Agent Customer Support Assistant** designed to autonomously resolve complex customer queries, retrieve grounded policy answers via semantic vector search, detect frustration in real time, and automatically escalate critical issues to human desks.
 
-[Live](https://multi-agent-customer-support-three.vercel.app/)
+---
+## 🟢 Live Demo Link
 
+* **Explore the App:** [➥ **Live Interactive Demo**](https://multi-agent-customer-support-three.vercel.app/)
 ---
 
 ## 🏛️ System Architecture
