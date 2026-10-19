@@ -26,6 +26,16 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         return response
 
+class KeepAliveLoggingMiddleware(BaseHTTPMiddleware):
+    """Logs keep-alive ping explicitly only when triggered by the GitHub Actions workflow."""
+    async def dispatch(self, request: Request, call_next):
+        if request.headers.get("x-keepalive-source") == "GitHub-Actions-AntiSleep":
+            client_ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "unknown")
+            user_agent = request.headers.get("user-agent", "unknown")
+            ip_clean = client_ip.split(",")[0].strip()
+            logger.info(f"🟢 [Keep-Alive Ping] Keepalive ping received from {ip_clean} | UA: {user_agent}")
+        return await call_next(request)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Initialize Database and Knowledge Seed
@@ -50,6 +60,7 @@ app = FastAPI(
 
 # Security & Reverse Proxy Headers
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(KeepAliveLoggingMiddleware)
 
 # CORS Middleware (Allows Vercel Frontend and local dev)
 app.add_middleware(
@@ -68,11 +79,7 @@ app.include_router(health_router)
 
 @app.get("/api/ping", tags=["Health & Status"])
 @app.head("/api/ping", tags=["Health & Status"])
-async def ping_alias(request: Request):
-    client_ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "unknown")
-    user_agent = request.headers.get("user-agent", "unknown")
-    ip_clean = client_ip.split(",")[0].strip()
-    logger.info(f"🟢 [Keep-Alive Ping] Keepalive ping received from {ip_clean} | UA: {user_agent[:45]}")
+async def ping_alias():
     return {"status": "awake", "service": "customer-support-api"}
 
 @app.get("/", tags=["Root"])

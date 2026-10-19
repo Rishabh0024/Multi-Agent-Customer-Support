@@ -2,8 +2,8 @@ name: Render Backend Anti-Sleep Keep-Alive
 
 on:
   schedule:
-    # Run every 11 minutes (combined with 0-180s jitter, yields 11 to 14 minutes interval)
-    - cron: '*/11 * * * *'
+    # Run every 5 minutes (the shortest interval allowed by GitHub Actions scheduler)
+    - cron: '*/5 * * * *'
   workflow_dispatch: # Allows manual on-demand trigger from GitHub Actions tab
 
 jobs:
@@ -18,14 +18,13 @@ jobs:
           TARGET_HOST="${BACKEND_URL:-https://multi-agent-customer-support-api-cg0x.onrender.com}"
           echo "Base Host: ${TARGET_HOST}"
 
-          # Randomized jitter between 0 and 180 seconds (0 to 3 minutes)
-          # Baseline 11m schedule + (0 to 3m jitter) = 11 to 14 minutes inclusive dispatch window
-          SLEEP_SECONDS=$(( RANDOM % 181 ))
-          echo "Applying dynamic jitter: sleeping for ${SLEEP_SECONDS}s to randomize request signature..."
+          # Minimal anti-bot jitter (0 to 10 seconds)
+          SLEEP_SECONDS=$(( RANDOM % 10 ))
+          echo "Applying dynamic jitter: sleeping for ${SLEEP_SECONDS}s..."
           sleep "$SLEEP_SECONDS"
 
-          # Endpoint rotation across healthy non-destructive endpoints (including /api/ping)
-          ENDPOINTS=("/api/ping" "/api/chat/models" "/api/health" "/")
+          # Endpoint rotation across 4 routes: /api/ping, /api/health, /api/chat/models, /
+          ENDPOINTS=("/api/ping" "/api/health" "/api/chat/models" "/")
           SELECTED_ENDPOINT="${ENDPOINTS[$(( RANDOM % ${#ENDPOINTS[@]} ))]}"
           TARGET_URL="${TARGET_HOST%/}${SELECTED_ENDPOINT}"
 
@@ -43,10 +42,12 @@ jobs:
           echo "📅 UTC Timestamp: $(date -u)"
           echo "🎯 Target URL: ${TARGET_URL}"
           echo "🌐 Client User-Agent: ${SELECTED_UA}"
+          echo "🏷️ Source Header: X-Keepalive-Source: GitHub-Actions-AntiSleep"
           echo "=============================================="
 
-          # Ping request with output capture
+          # Ping request with custom keep-alive identifier header
           HTTP_BODY=$(curl -s \
+            -H "X-Keepalive-Source: GitHub-Actions-AntiSleep" \
             -H "User-Agent: ${SELECTED_UA}" \
             -H "Accept: application/json, text/plain, */*" \
             -H "Accept-Language: en-US,en;q=0.9" \
@@ -58,6 +59,7 @@ jobs:
             "$TARGET_URL" || true)
 
           HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "X-Keepalive-Source: GitHub-Actions-AntiSleep" \
             -H "User-Agent: ${SELECTED_UA}" \
             -H "Accept: application/json, text/plain, */*" \
             --max-time 15 \
